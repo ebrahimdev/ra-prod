@@ -2,7 +2,7 @@
   "name": "quill",
   "displayName": "Quill RAG Extension",
   "description": "VSCode extension for RAG functionality",
-  "version": "0.0.5",
+  "version": "0.0.9",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -11,11 +11,32 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ebrahimdev/ra-prod.git"
+  },
+  "license": "MIT",
   "contributes": {
     "commands": [
       {
         "command": "quill.query",
-        "title": "Query RAG"
+        "title": "Quill: Query RAG"
+      },
+      {
+        "command": "quill.login",
+        "title": "Quill: Login"
+      },
+      {
+        "command": "quill.register",
+        "title": "Quill: Register"
+      },
+      {
+        "command": "quill.logout",
+        "title": "Quill: Logout"
+      },
+      {
+        "command": "quill.status",
+        "title": "Quill: Auth Status"
       }
     ]
   },

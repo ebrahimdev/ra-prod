@@ -4,8 +4,8 @@ import { RagProvider } from '../providers/ragProvider';
 export class QueryCommand {
     private ragProvider: RagProvider;
 
-    constructor() {
-        this.ragProvider = new RagProvider();
+    constructor(context: vscode.ExtensionContext) {
+        this.ragProvider = new RagProvider(context);
     }
 
     async execute() {
@@ -21,8 +21,9 @@ export class QueryCommand {
         try {
             const response = await this.ragProvider.query(query);
             vscode.window.showInformationMessage(`Response: ${response}`);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error}`);
+        } catch (error: any) {
+            const errorMessage = error.message || 'Unknown error occurred';
+            vscode.window.showErrorMessage(`Error: ${errorMessage}`);
         }
     }
 }
