@@ -1,6 +1,7 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from src.api.routes import api_bp
+from src.api.document_routes import doc_bp
 from src.utils.logger import setup_logger
 from config.settings import Settings
 
@@ -8,10 +9,15 @@ def create_app():
     app = Flask(__name__)
     CORS(app)
     
+    @app.route('/health', methods=['GET'])
+    def health():
+        return jsonify({"status": "healthy", "service": "rag-server"})
+    
     app.register_blueprint(api_bp)
+    app.register_blueprint(doc_bp)
     
     logger = setup_logger(__name__)
-    logger.info("RAG server initialized")
+    logger.info("RAG server initialized with PDF processing capabilities")
     
     return app
 
