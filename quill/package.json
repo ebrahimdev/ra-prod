@@ -2,7 +2,7 @@
   "name": "quill",
   "displayName": "Quill RAG Extension",
   "description": "VSCode extension for RAG functionality",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -41,6 +41,10 @@
       {
         "command": "quill.uploadPdf",
         "title": "Upload to RAG"
+      },
+      {
+        "command": "quill.clearLibrary",
+        "title": "Quill: Clear Document Library"
       }
     ],
     "menus": {
