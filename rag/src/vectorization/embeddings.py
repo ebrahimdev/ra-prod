@@ -43,8 +43,6 @@ class EmbeddingService:
             
             if chunk_type == 'text':
                 return self._embed_text_chunk(content, metadata, chunk)
-            elif chunk_type == 'image':
-                return self._embed_image_chunk(chunk)
             elif chunk_type == 'table':
                 return self._embed_table_chunk(chunk)
             elif chunk_type == 'reference':
@@ -89,40 +87,6 @@ class EmbeddingService:
         
         return self.embed_text(enriched_content)
     
-    def _embed_image_chunk(self, chunk: Dict) -> List[float]:
-        """Embedding for image chunks using OCR text and metadata."""
-        content_parts = []
-        
-        # Add image type information
-        image_data = chunk.get('image_data', {})
-        metadata = chunk.get('metadata', {})
-        
-        image_type = metadata.get('image_type', 'figure')
-        content_parts.append(f"[{image_type.upper()}]")
-        
-        # Add OCR text if available
-        ocr_text = image_data.get('ocr_text', '')
-        if ocr_text:
-            content_parts.append(f"OCR: {ocr_text}")
-        
-        # Add content classification
-        content_type = image_data.get('content_type', '')
-        if content_type:
-            content_parts.append(f"Content type: {content_type}")
-        
-        # Add caption or description
-        content = chunk.get('content', '')
-        if content:
-            content_parts.append(content)
-        
-        # Add mathematical symbols if it's a formula
-        if image_data.get('is_formula'):
-            math_symbols = image_data.get('math_symbols', [])
-            if math_symbols:
-                content_parts.append(f"Math symbols: {', '.join(math_symbols)}")
-        
-        combined_content = ' '.join(content_parts)
-        return self.embed_text(combined_content)
     
     def _embed_table_chunk(self, chunk: Dict) -> List[float]:
         """Embedding for table chunks."""

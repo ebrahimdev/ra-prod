@@ -3,10 +3,9 @@ import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from ..models.document import Document, DocumentChunk, DocumentImage
+from ..models.document import Document, DocumentChunk
 from ..pdf.extractor import PDFExtractor
 from ..pdf.chunker import DocumentChunker
-from ..pdf.ocr_processor import OCRProcessor
 from ..vectorization.embeddings import EmbeddingService
 from ..utils.logger import setup_logger
 
@@ -17,7 +16,6 @@ class DocumentService:
         self.db = db_session
         self.pdf_extractor = PDFExtractor()
         self.chunker = DocumentChunker()
-        self.ocr_processor = OCRProcessor()
         self.embedding_service = EmbeddingService()
     
     def upload_document(self, user_id: int, file_path: str, filename: str) -> Document:
@@ -167,11 +165,6 @@ class DocumentService:
             logger.info(f"Extracting content from document {document.id}")
             extracted_content = self.pdf_extractor.extract_content(file_path)
             
-            # Process images with OCR
-            for image_data in extracted_content['images']:
-                processed_image = self.ocr_processor.process_image(image_data)
-                extracted_content['images'][extracted_content['images'].index(image_data)] = processed_image
-            
             # Update document metadata
             document.doc_metadata = {
                 'page_count': extracted_content['page_count'],
@@ -205,10 +198,6 @@ class DocumentService:
                     
                     self.db.add(chunk)
                     
-                    # Store image data if it's an image chunk
-                    if chunk_data['chunk_type'] == 'image' and 'image_data' in chunk_data:
-                        self._store_image_data(chunk, chunk_data['image_data'], document.id)
-                    
                 except Exception as e:
                     logger.error(f"Error processing chunk: {str(e)}")
             
@@ -225,27 +214,6 @@ class DocumentService:
             logger.error(f"Error processing document {document.id}: {str(e)}")
             raise
     
-    def _store_image_data(self, chunk: DocumentChunk, image_data: Dict, document_id: int):
-        """Store image data separately."""
-        try:
-            # In production, you'd store images in object storage (S3, etc.)
-            # For now, we'll just store metadata
-            
-            image = DocumentImage(
-                document_id=document_id,
-                chunk_id=chunk.id,
-                image_path=f"images/{document_id}_{chunk.id}",  # Placeholder path
-                image_type=image_data.get('content_type', 'figure'),
-                caption=image_data.get('caption', ''),
-                page_number=chunk.page_number,
-                bbox=image_data.get('bbox'),
-                ocr_text=image_data.get('ocr_text', '')
-            )
-            
-            self.db.add(image)
-            
-        except Exception as e:
-            logger.error(f"Error storing image data: {str(e)}")
     
     def _calculate_file_hash(self, file_path: str) -> str:
         """Calculate SHA-256 hash of file."""

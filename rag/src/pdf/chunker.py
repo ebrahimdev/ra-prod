@@ -1,6 +1,7 @@
 import re
 from typing import List, Dict, Any, Tuple
 from ..utils.logger import setup_logger
+from ..llm.client import OpenChatClient
 
 logger = setup_logger(__name__)
 
@@ -8,6 +9,7 @@ class DocumentChunker:
     def __init__(self, chunk_size: int = 512, overlap: int = 50):
         self.chunk_size = chunk_size
         self.overlap = overlap
+        self.llm_client = OpenChatClient()
         
         # Citation patterns
         self.citation_patterns = [
@@ -34,16 +36,11 @@ class DocumentChunker:
         chunks = []
         text_content = extracted_content['text_content']
         structure = extracted_content['structure']
-        images = extracted_content['images']
         tables = extracted_content.get('tables', [])
         
-        # Create section-based chunks
-        section_chunks = self._create_section_chunks(text_content, structure)
+        # Create semantic chunks using LLM analysis
+        section_chunks = self._create_semantic_chunks(text_content, structure)
         chunks.extend(section_chunks)
-        
-        # Create image chunks
-        image_chunks = self._create_image_chunks(images)
-        chunks.extend(image_chunks)
         
         # Create table chunks
         table_chunks = self._create_table_chunks(tables)
@@ -63,13 +60,12 @@ class DocumentChunker:
         logger.info(f"Created {len(chunks)} chunks from document")
         return chunks
     
-    def _create_section_chunks(self, text_content: List[Dict], structure: Dict) -> List[Dict[str, Any]]:
-        """Create chunks based on document sections."""
+    def _create_semantic_chunks(self, text_content: List[Dict], structure: Dict) -> List[Dict[str, Any]]:
+        """Create chunks using LLM-guided semantic analysis."""
         chunks = []
         sections = structure.get('sections', [])
         
         if not sections:
-            # Fallback to page-based chunking if no sections detected
             return self._create_page_chunks(text_content)
         
         for section in sections:
@@ -81,38 +77,124 @@ class DocumentChunker:
             section_blocks = text_content[start_idx:end_idx + 1]
             section_text = self._combine_text_blocks(section_blocks)
             
-            if len(section_text) > self.chunk_size:
-                # Split large sections into smaller chunks
-                sub_chunks = self._split_long_text(section_text, section_title)
-                for i, sub_chunk in enumerate(sub_chunks):
+            try:
+                # Use LLM to analyze content structure
+                structure_analysis = self.llm_client.analyze_content_structure(section_text)
+                boundaries = structure_analysis.get('boundaries', [])
+                topics = structure_analysis.get('topics', [])
+                section_type = structure_analysis.get('section_type', 'other')
+                
+                if boundaries and len(section_text) > self.chunk_size:
+                    # Use LLM-identified boundaries for chunking
+                    semantic_chunks = self._split_by_semantic_boundaries(
+                        section_text, boundaries, section_title
+                    )
+                else:
+                    # Use traditional chunking for smaller sections
+                    semantic_chunks = [section_text] if len(section_text) <= self.chunk_size else self._split_long_text(section_text, section_title)
+                
+                # Extract research concepts for each chunk
+                for i, chunk_text in enumerate(semantic_chunks):
+                    concepts = self.llm_client.extract_research_concepts(chunk_text)
+                    summary = self.llm_client.generate_chunk_summary(chunk_text)
+                    
                     chunks.append({
-                        'content': sub_chunk,
+                        'content': chunk_text,
                         'chunk_type': 'text',
                         'section_title': section_title,
-                        'section_type': section.get('type', 'other'),
+                        'section_type': section_type,
                         'page_number': section['page'],
                         'sub_chunk_index': i,
                         'position': start_idx,
                         'metadata': {
-                            'word_count': len(sub_chunk.split()),
-                            'has_citations': self._has_citations(sub_chunk),
-                            'has_formulas': self._has_formulas(sub_chunk)
+                            'word_count': len(chunk_text.split()),
+                            'has_citations': self._has_citations(chunk_text),
+                            'has_formulas': self._has_formulas(chunk_text),
+                            'topics': topics,
+                            'research_concepts': concepts.get('concepts', []),
+                            'methods': concepts.get('methods', []),
+                            'keywords': concepts.get('keywords', []),
+                            'research_area': concepts.get('research_area', 'unknown'),
+                            'semantic_summary': summary
                         }
                     })
-            else:
+                    
+            except Exception as e:
+                logger.warning(f"LLM analysis failed for section '{section_title}': {e}")
+                # Fallback to traditional chunking
+                fallback_chunks = self._create_traditional_section_chunk(
+                    section_text, section_title, section, start_idx
+                )
+                chunks.extend(fallback_chunks)
+        
+        return chunks
+    
+    def _split_by_semantic_boundaries(self, text: str, boundaries: List[int], section_title: str) -> List[str]:
+        """Split text using LLM-identified semantic boundaries."""
+        if not boundaries:
+            return [text]
+        
+        chunks = []
+        boundaries = sorted([b for b in boundaries if 0 <= b < len(text)])
+        boundaries = [0] + boundaries + [len(text)]
+        
+        for i in range(len(boundaries) - 1):
+            start = boundaries[i]
+            end = boundaries[i + 1]
+            chunk_text = text[start:end].strip()
+            
+            if chunk_text and len(chunk_text) > 50:  # Minimum chunk size
+                chunks.append(chunk_text)
+        
+        return chunks if chunks else [text]
+    
+    def _create_traditional_section_chunk(self, section_text: str, section_title: str, section: Dict, start_idx: int) -> List[Dict[str, Any]]:
+        """Fallback to traditional chunking for a section."""
+        chunks = []
+        
+        if len(section_text) > self.chunk_size:
+            sub_chunks = self._split_long_text(section_text, section_title)
+            for i, sub_chunk in enumerate(sub_chunks):
                 chunks.append({
-                    'content': section_text,
+                    'content': sub_chunk,
                     'chunk_type': 'text',
                     'section_title': section_title,
                     'section_type': section.get('type', 'other'),
                     'page_number': section['page'],
+                    'sub_chunk_index': i,
                     'position': start_idx,
                     'metadata': {
-                        'word_count': len(section_text.split()),
-                        'has_citations': self._has_citations(section_text),
-                        'has_formulas': self._has_formulas(section_text)
+                        'word_count': len(sub_chunk.split()),
+                        'has_citations': self._has_citations(sub_chunk),
+                        'has_formulas': self._has_formulas(sub_chunk),
+                        'topics': [],
+                        'research_concepts': [],
+                        'methods': [],
+                        'keywords': [],
+                        'research_area': 'unknown',
+                        'semantic_summary': ''
                     }
                 })
+        else:
+            chunks.append({
+                'content': section_text,
+                'chunk_type': 'text',
+                'section_title': section_title,
+                'section_type': section.get('type', 'other'),
+                'page_number': section['page'],
+                'position': start_idx,
+                'metadata': {
+                    'word_count': len(section_text.split()),
+                    'has_citations': self._has_citations(section_text),
+                    'has_formulas': self._has_formulas(section_text),
+                    'topics': [],
+                    'research_concepts': [],
+                    'methods': [],
+                    'keywords': [],
+                    'research_area': 'unknown',
+                    'semantic_summary': ''
+                }
+            })
         
         return chunks
     
@@ -165,54 +247,25 @@ class DocumentChunker:
         
         return chunks
     
-    def _create_image_chunks(self, images: List[Dict]) -> List[Dict[str, Any]]:
-        """Create chunks for images and figures."""
-        chunks = []
-        
-        for i, image in enumerate(images):
-            # Extract caption or description if available
-            caption = image.get('caption', '')
-            image_type = image.get('type', 'figure')
-            
-            content = f"[{image_type.upper()}] "
-            if caption:
-                content += caption
-            else:
-                content += f"Image on page {image['page']}"
-            
-            chunks.append({
-                'content': content,
-                'chunk_type': 'image',
-                'section_title': f"Figure {i+1}",
-                'section_type': 'figure',
-                'page_number': image['page'],
-                'position': i,
-                'metadata': {
-                    'image_index': i,
-                    'image_type': image_type,
-                    'image_size': image.get('size', []),
-                    'bbox': image.get('bbox', []),
-                    'has_ocr_text': bool(image.get('ocr_text', ''))
-                },
-                'image_data': {
-                    'format': image.get('format', ''),
-                    'data': image.get('data', ''),  # base64 encoded
-                    'ocr_text': image.get('ocr_text', '')
-                }
-            })
-        
-        return chunks
     
     def _create_table_chunks(self, tables: List[Dict]) -> List[Dict[str, Any]]:
-        """Create chunks for tables."""
+        """Create enhanced chunks for tables with LLM analysis."""
         chunks = []
         
         for i, table in enumerate(tables):
-            # Convert table data to text representation
             table_text = self._table_to_text(table['data'])
+            full_content = f"[TABLE] {table_text}"
+            
+            # Try to extract concepts from table content
+            concepts = {}
+            if table_text:
+                try:
+                    concepts = self.llm_client.extract_research_concepts(table_text)
+                except Exception as e:
+                    logger.warning(f"Failed to analyze table content: {e}")
             
             chunks.append({
-                'content': f"[TABLE] {table_text}",
+                'content': full_content,
                 'chunk_type': 'table',
                 'section_title': f"Table {i+1}",
                 'section_type': 'table',
@@ -222,7 +275,10 @@ class DocumentChunker:
                     'table_index': i,
                     'rows': table['rows'],
                     'cols': table['cols'],
-                    'bbox': table.get('bbox', [])
+                    'bbox': table.get('bbox', []),
+                    'research_concepts': concepts.get('concepts', []),
+                    'keywords': concepts.get('keywords', []),
+                    'research_area': concepts.get('research_area', 'unknown')
                 },
                 'table_data': table['data']
             })
