@@ -3,6 +3,7 @@ import * as path from 'path';
 import { DocumentService, Document } from '../services/documentService';
 import { AuthService } from '../services/authService';
 import { RagProvider } from './ragProvider';
+import { SearchResultsEditorProvider } from './searchResultsEditorProvider';
 
 export class DashboardProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'quill.dashboard';
@@ -326,6 +327,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
             console.log(`[Dashboard] Search completed. Results count: ${searchResponse.count}`);
             console.log(`[Dashboard] Search results:`, searchResponse.results);
             
+            // Send results to dashboard
             this._view?.webview.postMessage({
                 command: 'searchResults',
                 results: searchResponse.results,
@@ -333,7 +335,10 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 count: searchResponse.count
             });
             
-            console.log(`[Dashboard] Sent searchResults message to webview`);
+            // Open search results in editor tab
+            await SearchResultsEditorProvider.openSearchResults(query, searchResponse.results);
+            
+            console.log(`[Dashboard] Sent searchResults message to webview and opened search results editor`);
         } catch (error: any) {
             console.error(`[Dashboard] Search error:`, error);
             this._view?.webview.postMessage({
