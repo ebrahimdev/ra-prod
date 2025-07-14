@@ -2,7 +2,7 @@
   "name": "quill",
   "displayName": "Quill RAG Extension",
   "description": "VSCode extension for RAG functionality",
-  "version": "0.0.11",
+  "version": "0.0.24",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -45,8 +45,30 @@
       {
         "command": "quill.clearLibrary",
         "title": "Quill: Clear Document Library"
+      },
+      {
+        "command": "quill.dashboard",
+        "title": "Quill: Open Dashboard"
       }
     ],
+    "views": {
+      "quill": [
+        {
+          "id": "quill.dashboard",
+          "name": "Dashboard",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "quill",
+          "title": "Quill RAG",
+          "icon": "$(book)"
+        }
+      ]
+    },
     "menus": {
       "explorer/context": [
         {

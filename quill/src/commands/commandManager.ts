@@ -3,18 +3,21 @@ import { QueryCommand } from './queryCommand';
 import { AuthCommand } from './authCommand';
 import { UploadCommand } from './uploadCommand';
 import { ClearLibraryCommand } from './clearLibraryCommand';
+import { DashboardCommand } from './dashboardCommand';
 
 export class CommandManager {
     private queryCommand: QueryCommand;
     private authCommand: AuthCommand;
     private uploadCommand: UploadCommand;
     private clearLibraryCommand: ClearLibraryCommand;
+    private dashboardCommand: DashboardCommand;
 
     constructor(context: vscode.ExtensionContext) {
         this.queryCommand = new QueryCommand(context);
         this.authCommand = new AuthCommand(context);
         this.uploadCommand = new UploadCommand(context);
         this.clearLibraryCommand = new ClearLibraryCommand(context);
+        this.dashboardCommand = new DashboardCommand(context);
     }
 
     registerCommands(context: vscode.ExtensionContext) {
@@ -53,6 +56,11 @@ export class CommandManager {
             () => this.clearLibraryCommand.execute()
         );
 
+        const dashboardDisposable = vscode.commands.registerCommand(
+            'quill.dashboard',
+            () => this.dashboardCommand.execute()
+        );
+
         context.subscriptions.push(
             queryDisposable,
             loginDisposable,
@@ -60,7 +68,8 @@ export class CommandManager {
             logoutDisposable,
             statusDisposable,
             uploadDisposable,
-            clearLibraryDisposable
+            clearLibraryDisposable,
+            dashboardDisposable
         );
     }
 }

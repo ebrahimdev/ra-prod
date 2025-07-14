@@ -240,3 +240,60 @@ def search_documents():
     except Exception as e:
         logger.error(f"Error searching documents: {str(e)}")
         return jsonify({"error": "Failed to search documents"}), 500
+
+@doc_bp.route('/clear-all', methods=['DELETE'])
+@require_auth
+def clear_all_documents():
+    """Delete all documents for the authenticated user (factory reset)."""
+    try:
+        user_id = request.current_user['id']
+        
+        db = get_db()
+        try:
+            document_service = DocumentService(db)
+            
+            # Get all user documents first
+            documents = document_service.get_user_documents(user_id)
+            
+            if not documents:
+                return jsonify({
+                    "message": "No documents to delete",
+                    "deleted_count": 0
+                })
+            
+            deleted_count = 0
+            failed_deletions = []
+            
+            # Delete each document
+            for document in documents:
+                try:
+                    success = document_service.delete_document(user_id, document.id)
+                    if success:
+                        deleted_count += 1
+                    else:
+                        failed_deletions.append(document.title)
+                except Exception as e:
+                    logger.error(f"Failed to delete document {document.id}: {str(e)}")
+                    failed_deletions.append(document.title)
+            
+            # Prepare response
+            response_data = {
+                "message": f"Library cleared successfully",
+                "deleted_count": deleted_count,
+                "total_documents": len(documents)
+            }
+            
+            if failed_deletions:
+                response_data["warning"] = f"Failed to delete {len(failed_deletions)} document(s)"
+                response_data["failed_documents"] = failed_deletions
+            
+            logger.info(f"User {user_id} cleared their library: {deleted_count}/{len(documents)} documents deleted")
+            
+            return jsonify(response_data)
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error clearing user library: {str(e)}")
+        return jsonify({"error": "Failed to clear document library"}), 500

@@ -165,11 +165,22 @@ class DocumentService:
             logger.info(f"Extracting content from document {document.id}")
             extracted_content = self.pdf_extractor.extract_content(file_path)
             
+            # Extract actual title from PDF metadata or content
+            pdf_title = self._extract_paper_title(extracted_content)
+            if pdf_title and pdf_title.strip():
+                # Update document title with actual paper title (truncate to ~60 chars like VSCode)
+                if len(pdf_title) > 60:
+                    document.title = pdf_title[:57] + "..."
+                else:
+                    document.title = pdf_title
+                logger.info(f"Updated document title to: {document.title}")
+            
             # Update document metadata
             document.doc_metadata = {
                 'page_count': extracted_content['page_count'],
                 'pdf_metadata': extracted_content['metadata'],
-                'structure': extracted_content['structure']
+                'structure': extracted_content['structure'],
+                'original_title': pdf_title
             }
             
             # Create chunks
@@ -205,15 +216,78 @@ class DocumentService:
             document.status = 'completed'
             document.processed_date = datetime.utcnow()
             
+            # Clean up uploaded file after successful processing
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Cleaned up uploaded file: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up uploaded file {file_path}: {str(cleanup_error)}")
+            
             self.db.commit()
             logger.info(f"Document processing completed: {document.id}")
             
         except Exception as e:
             document.status = 'failed'
+            
+            # Clean up uploaded file on failure too
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"Cleaned up uploaded file after failure: {file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up uploaded file {file_path}: {str(cleanup_error)}")
+            
             self.db.commit()
             logger.error(f"Error processing document {document.id}: {str(e)}")
             raise
     
+    
+    def _extract_paper_title(self, extracted_content: Dict[str, Any]) -> Optional[str]:
+        """Extract the actual paper title from PDF content."""
+        try:
+            # First try PDF metadata title
+            metadata = extracted_content.get('metadata', {})
+            if metadata.get('title') and metadata['title'].strip():
+                return metadata['title'].strip()
+            
+            # Then try to find title from text content (usually in first few pages)
+            text_content = extracted_content.get('text_content', [])
+            
+            # Look for title patterns in the first few pages
+            for content_block in text_content[:20]:  # Check first 20 text blocks
+                text = content_block.get('text', '').strip()
+                if not text:
+                    continue
+                
+                # Skip very short text (likely not a title)
+                if len(text) < 10:
+                    continue
+                
+                # Skip text that looks like headers, footers, or page numbers
+                if any(pattern in text.lower() for pattern in ['abstract', 'introduction', 'page', 'figure', 'table']):
+                    continue
+                
+                # Skip if it's all uppercase (likely a header/section)
+                if text.isupper():
+                    continue
+                
+                # Skip if it has too many special characters
+                special_char_ratio = sum(1 for c in text if not c.isalnum() and c != ' ') / len(text)
+                if special_char_ratio > 0.3:
+                    continue
+                
+                # Check if this looks like a title (reasonable length, proper formatting)
+                words = text.split()
+                if 3 <= len(words) <= 20 and content_block.get('page_number', 1) <= 2:
+                    # This could be the title
+                    return text
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error extracting paper title: {str(e)}")
+            return None
     
     def _calculate_file_hash(self, file_path: str) -> str:
         """Calculate SHA-256 hash of file."""
