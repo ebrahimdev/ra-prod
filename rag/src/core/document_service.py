@@ -98,30 +98,49 @@ class DocumentService:
     
     def search_documents(self, user_id: int, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
         """Search through user's documents using semantic similarity."""
-        logger.info(f"Searching documents for user {user_id}: {query}")
+        logger.info(f"Searching documents for user {user_id}: '{query}' (top_k: {top_k})")
         
         try:
             # Generate query embedding
+            logger.info("Generating query embedding")
             query_embedding = self.embedding_service.embed_text(query)
+            logger.info(f"Query embedding generated, shape: {len(query_embedding) if query_embedding else 'None'}")
             
             # Get all chunks for the user's documents
+            logger.info("Querying database for user's document chunks")
             chunks = self.db.query(DocumentChunk).join(Document).filter(
                 Document.user_id == user_id,
                 Document.status == 'completed'
             ).all()
             
+            logger.info(f"Found {len(chunks)} chunks for user {user_id}")
+            
             if not chunks:
+                logger.warning(f"No chunks found for user {user_id}")
                 return []
+            
+            # Log document count and status
+            documents = self.db.query(Document).filter_by(user_id=user_id).all()
+            logger.info(f"User has {len(documents)} total documents")
+            completed_docs = [d for d in documents if d.status == 'completed']
+            logger.info(f"User has {len(completed_docs)} completed documents")
             
             # Calculate similarities
             results = []
+            processed_chunks = 0
+            chunks_with_embeddings = 0
+            
             for chunk in chunks:
+                processed_chunks += 1
                 if chunk.embedding_vector:
+                    chunks_with_embeddings += 1
                     try:
                         chunk_embedding = chunk.embedding_vector
                         similarity = self.embedding_service.compute_similarity(
                             query_embedding, chunk_embedding
                         )
+                        
+                        logger.debug(f"Chunk {chunk.id} similarity: {similarity:.4f}")
                         
                         results.append({
                             'chunk_id': chunk.id,
@@ -136,13 +155,28 @@ class DocumentService:
                         })
                     except Exception as e:
                         logger.warning(f"Error processing chunk {chunk.id}: {str(e)}")
+                else:
+                    logger.debug(f"Chunk {chunk.id} has no embedding vector")
+            
+            logger.info(f"Processed {processed_chunks} chunks, {chunks_with_embeddings} had embeddings")
+            logger.info(f"Generated {len(results)} similarity results")
             
             # Sort by similarity and return top results
             results.sort(key=lambda x: x['similarity'], reverse=True)
-            return results[:top_k]
+            top_results = results[:top_k]
+            
+            if top_results:
+                logger.info(f"Top result similarity: {top_results[0]['similarity']:.4f}")
+                logger.info(f"Returning top {len(top_results)} results")
+            else:
+                logger.warning("No results to return")
+            
+            return top_results
             
         except Exception as e:
             logger.error(f"Error searching documents: {str(e)}")
+            import traceback
+            logger.error(f"Search error traceback: {traceback.format_exc()}")
             return []
     
     def get_document_chunks(self, user_id: int, document_id: int) -> List[DocumentChunk]:

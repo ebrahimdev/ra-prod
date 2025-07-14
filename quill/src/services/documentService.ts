@@ -21,6 +21,24 @@ export interface UploadResponse {
     document: Document;
 }
 
+export interface SearchResult {
+    chunk_id: number;
+    document_id: number;
+    document_title: string;
+    content: string;
+    chunk_type: string;
+    section_title?: string;
+    page_number?: number;
+    similarity: number;
+    metadata?: any;
+}
+
+export interface SearchResponse {
+    query: string;
+    results: SearchResult[];
+    count: number;
+}
+
 export class DocumentService {
     private authService: AuthService;
     private configManager: ConfigManager;
@@ -145,7 +163,6 @@ export class DocumentService {
         const baseUrl = this.configManager.getRagServerUrl();
         const deleteUrl = `${baseUrl}/api/documents/${documentId}`;
         
-        console.log(`Attempting to delete document at URL: ${deleteUrl}`);
         
         try {
             await axios.delete(deleteUrl, {
@@ -164,14 +181,12 @@ export class DocumentService {
                             }
                         });
                     } catch (retryError: any) {
-                        console.error('Delete retry failed:', retryError.response?.status, retryError.response?.data);
                         throw new Error(`Failed to delete document: ${retryError.response?.status} - ${retryError.response?.data?.error || retryError.message}`);
                     }
                 } else {
                     throw new Error('Authentication expired. Please login again.');
                 }
             } else {
-                console.error('Delete failed:', error.response?.status, error.response?.data, error.config?.url);
                 throw new Error(`Failed to delete document: ${error.response?.status} - ${error.response?.data?.error || error.message}`);
             }
         }
@@ -211,6 +226,51 @@ export class DocumentService {
             } else {
                 const errorMessage = error.response?.data?.error || 'Failed to clear document library';
                 throw new Error(errorMessage);
+            }
+        }
+    }
+
+    async searchDocuments(query: string, topK: number = 10): Promise<SearchResponse> {
+        const tokens = await this.authService.getStoredTokens();
+        
+        if (!tokens) {
+            throw new Error('Not authenticated. Please login first.');
+        }
+
+        const baseUrl = this.configManager.getRagServerUrl();
+        
+        try {
+            const response = await axios.post(`${baseUrl}/api/documents/search`, {
+                query: query,
+                top_k: topK
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${tokens.access_token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            return response.data;
+        } catch (error: any) {
+            if (error.response?.status === 401) {
+                const refreshedTokens = await this.authService.refreshToken();
+                if (refreshedTokens) {
+                    const response = await axios.post(`${baseUrl}/api/documents/search`, {
+                        query: query,
+                        top_k: topK
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${refreshedTokens.access_token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    return response.data;
+                } else {
+                    throw new Error('Authentication expired. Please login again.');
+                }
+            } else {
+                throw new Error(`Failed to search documents: ${error.response?.status} - ${error.response?.data?.error || error.message}`);
             }
         }
     }

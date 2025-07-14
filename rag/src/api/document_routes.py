@@ -222,30 +222,47 @@ def search_documents():
     """Search through user's documents using semantic similarity."""
     try:
         user_id = request.current_user['id']
+        logger.info(f"Search request from user {user_id}")
+        
         data = request.get_json()
+        logger.info(f"Search request data: {data}")
         
         if not data or 'query' not in data:
+            logger.warning("Search request missing query parameter")
             return jsonify({"error": "Query is required"}), 400
         
         query = data['query']
         top_k = data.get('top_k', 10)
+        logger.info(f"Searching for query: '{query}' with top_k: {top_k}")
         
         db = get_db()
         try:
             document_service = DocumentService(db)
+            logger.info("Created document service, calling search_documents")
             results = document_service.search_documents(user_id, query, top_k)
+            logger.info(f"Search completed. Found {len(results)} results")
             
-            return jsonify({
+            if results:
+                logger.info(f"First result sample: {results[0] if results else 'None'}")
+            else:
+                logger.warning("No search results found")
+            
+            response_data = {
                 "query": query,
                 "results": results,
                 "count": len(results)
-            })
+            }
+            logger.info(f"Returning response with {len(results)} results")
+            
+            return jsonify(response_data)
             
         finally:
             db.close()
             
     except Exception as e:
         logger.error(f"Error searching documents: {str(e)}")
+        import traceback
+        logger.error(f"Search error traceback: {traceback.format_exc()}")
         return jsonify({"error": "Failed to search documents"}), 500
 
 @doc_bp.route('/clear-all', methods=['DELETE'])

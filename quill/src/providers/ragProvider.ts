@@ -19,7 +19,6 @@ export class RagProvider {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        console.log(`Making RAG query with token: ${tokens.access_token.substring(0, 20)}...`);
         const baseUrl = this.configManager.getRagServerUrl();
         
         try {
@@ -33,13 +32,9 @@ export class RagProvider {
 
             return response.data.response;
         } catch (error: any) {
-            console.log(`RAG query error:`, error.response?.status, error.response?.data);
-            
             if (error.response?.status === 401) {
-                console.log('Attempting token refresh...');
                 const refreshedTokens = await this.authService.refreshToken();
                 if (refreshedTokens) {
-                    console.log(`Retrying with refreshed token: ${refreshedTokens.access_token.substring(0, 20)}...`);
                     const response = await axios.post(`${baseUrl}/api/query`, {
                         query: query
                     }, {

@@ -68,6 +68,9 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     case 'getWorkspacePdfs':
                         this.getWorkspacePdfs();
                         return;
+                    case 'searchDocuments':
+                        this.handleSearchDocuments(message.query);
+                        return;
                 }
             },
             undefined,
@@ -310,6 +313,31 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         } catch (error: any) {
             this._view?.webview.postMessage({
                 command: 'queryError',
+                message: error.message
+            });
+        }
+    }
+
+    private async handleSearchDocuments(query: string) {
+        try {
+            console.log(`[Dashboard] Starting search for query: "${query}"`);
+            const searchResponse = await this.documentService.searchDocuments(query);
+            
+            console.log(`[Dashboard] Search completed. Results count: ${searchResponse.count}`);
+            console.log(`[Dashboard] Search results:`, searchResponse.results);
+            
+            this._view?.webview.postMessage({
+                command: 'searchResults',
+                results: searchResponse.results,
+                query: query,
+                count: searchResponse.count
+            });
+            
+            console.log(`[Dashboard] Sent searchResults message to webview`);
+        } catch (error: any) {
+            console.error(`[Dashboard] Search error:`, error);
+            this._view?.webview.postMessage({
+                command: 'searchError',
                 message: error.message
             });
         }
@@ -790,14 +818,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 let allPapers = state.allPapers;
                 let uploadingFiles = new Map(state.uploadingFiles || []); // Convert back to Map
                 
-                // Debug log to see what's being restored
-                console.log('Restored state:', {
-                    isAuthenticated,
-                    documentsCount: documents.length,
-                    workspacePdfsCount: workspacePdfs.length,
-                    uploadingFilesCount: uploadingFiles.size,
-                    uploadingFilesEntries: Array.from(uploadingFiles.entries())
-                });
                 
                 // Save state function
                 function saveState() {
@@ -854,6 +874,14 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                         case 'queryError':
                             hideQueryProgress();
                             showError('Query failed: ' + message.message);
+                            break;
+                        case 'searchResults':
+                            console.log('[Webview] Received searchResults message:', message);
+                            handleSearchResults(message.results, message.query);
+                            break;
+                        case 'searchError':
+                            console.log('[Webview] Received searchError message:', message);
+                            handleSearchError(message.message);
                             break;
                         case 'error':
                             showError(message.message);
@@ -930,7 +958,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                             
                             // Skip this document if we have an active upload for it
                             if (hasActiveUpload) {
-                                console.log('Skipping processing document because we have active upload:', doc.id, doc.title);
                                 return;
                             }
                         }
@@ -960,13 +987,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                         // Check if this PDF is currently being uploaded
                         const isUploading = uploadingFiles.has(pdf.path);
                         
-                        // Debug log for this file
-                        console.log(\`Processing workspace PDF: \${pdf.path}\`, {
-                            isUploaded,
-                            isUploading,
-                            uploadingFilesHas: uploadingFiles.has(pdf.path),
-                            uploadingFilesSize: uploadingFiles.size
-                        });
                         
                         // Only add if not uploaded and not currently uploading
                         if (!isUploaded && !isUploading) {
@@ -1016,9 +1036,15 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 }
 
                 function renderDocuments(docs, section = 'library', highlightedIds = []) {
-                    const container = section === 'library' ? 
-                        document.getElementById('documentsContainer') : 
-                        document.getElementById('resultsContainer');
+                    const containerId = section === 'library' ? 'documentsContainer' : 'resultsContainer';
+                    const container = document.getElementById(containerId);
+                    
+                    console.log('[Webview] renderDocuments: section=' + section + ', containerId=' + containerId + ', container=', container);
+                    
+                    if (!container) {
+                        console.error('[Webview] renderDocuments: Container element ' + containerId + ' not found');
+                        return;
+                    }
                     
                     if (docs.length === 0) {
                         if (section === 'library') {
@@ -1030,9 +1056,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     }
 
                     const grid = docs.map(doc => {
-                        // Debug log to see what we're rendering
-                        console.log('Rendering doc:', doc.id, 'status:', doc.status, 'type:', doc.type, 'title:', doc.title);
-                        
                         const indicatorClass = doc.status === 'completed' ? 'completed' : doc.status;
                         const shortTitle = getShortTitle(doc.title);
                         const isHighlighted = highlightedIds.includes(doc.id);
@@ -1190,7 +1213,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 function completeUpload(documentId, newTitle) {
                     // The document should appear in the next refresh with proper data
                     // Instead of trying to update the temp card, just refresh the data
-                    console.log('Upload completed for document:', documentId, 'with title:', newTitle);
                     
                     // Force refresh of documents to get the latest data
                     setTimeout(() => {
@@ -1205,11 +1227,19 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     results.innerHTML = '<div class="loading"><div class="spinner"></div>Searching...</div>';
                 }
 
+                function showSearchLoading() {
+                    const resultsSection = document.getElementById('resultsSection');
+                    const resultsContainer = document.getElementById('resultsContainer');
+                    
+                    resultsSection.style.display = 'block';
+                    resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Searching documents...</div>';
+                }
+
                 function hideQueryProgress() {
                     // Results will be replaced by actual results or hidden
                 }
 
-                function showSearchResults(matchedDocuments, query) {
+                function showSearchResults(matchedDocuments, query, searchResults) {
                     const resultsSection = document.getElementById('resultsSection');
                     const librarySection = document.getElementById('librarySection');
                     
@@ -1218,6 +1248,25 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                         // Show all documents in library as lowlighted
                         renderDocuments(documents, 'library', []);
                         return;
+                    }
+
+                    // Sort matched documents by relevance from search results
+                    if (searchResults && searchResults.length > 0) {
+                        // Create relevance map from search results
+                        const relevanceMap = new Map();
+                        searchResults.forEach(result => {
+                            const docId = result.document_id;
+                            if (!relevanceMap.has(docId) || relevanceMap.get(docId) < result.similarity) {
+                                relevanceMap.set(docId, result.similarity);
+                            }
+                        });
+                        
+                        // Sort by relevance score
+                        matchedDocuments.sort((a, b) => {
+                            const aScore = relevanceMap.get(a.id) || 0;
+                            const bScore = relevanceMap.get(b.id) || 0;
+                            return bScore - aScore;
+                        });
                     }
 
                     // Show results section with top 3 matches
@@ -1241,7 +1290,6 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
                 function showError(message) {
                     // Find a good place to show the error, or create a toast
-                    console.error(message);
                 }
 
                 // UI Actions
@@ -1278,28 +1326,69 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
                 function performSearch() {
                     const query = document.getElementById('queryInput').value.trim();
-                    if (query) {
-                        // For now, perform client-side search on document titles
-                        // In future, this could call a search API endpoint
-                        const matchedDocs = documents.filter(doc => 
-                            doc.title.toLowerCase().includes(query.toLowerCase()) ||
-                            (doc.metadata && JSON.stringify(doc.metadata).toLowerCase().includes(query.toLowerCase()))
-                        );
-                        
-                        // Sort by relevance (simple title match scoring)
-                        matchedDocs.sort((a, b) => {
-                            const aScore = a.title.toLowerCase().indexOf(query.toLowerCase());
-                            const bScore = b.title.toLowerCase().indexOf(query.toLowerCase());
-                            if (aScore === -1 && bScore === -1) return 0;
-                            if (aScore === -1) return 1;
-                            if (bScore === -1) return -1;
-                            return aScore - bScore;
-                        });
-                        
-                        showSearchResults(matchedDocs, query);
-                    } else {
+                    console.log('[Webview] performSearch called with query:', query);
+                    
+                    if (!query) {
+                        console.log('[Webview] Empty query, clearing results');
                         clearSearchResults();
+                        return;
                     }
+
+                    // Show loading state
+                    console.log('[Webview] Showing search loading state');
+                    showSearchLoading();
+
+                    // Store current search query for result handling
+                    currentSearchQuery = query;
+                    console.log('[Webview] Set currentSearchQuery to:', currentSearchQuery);
+
+                    // Send search request to extension
+                    console.log('[Webview] Sending searchDocuments message to extension');
+                    vscode.postMessage({ command: 'searchDocuments', query: query });
+                }
+
+                let currentSearchQuery = '';
+
+                function handleSearchResults(searchResults, query) {
+                    console.log('[Webview] handleSearchResults called with:', { searchResults, query, currentSearchQuery });
+                    
+                    // Ensure this is for the current search
+                    if (query !== currentSearchQuery) {
+                        console.log('[Webview] Query mismatch, ignoring results');
+                        return;
+                    }
+
+                    try {
+                        console.log('[Webview] Processing search results...');
+                        console.log('[Webview] Current documents array:', documents);
+                        
+                        // Get unique document IDs from search results
+                        const matchedDocIds = new Set(searchResults.map(result => result.document_id));
+                        console.log('[Webview] Matched document IDs:', Array.from(matchedDocIds));
+                        
+                        // Filter documents to show matched ones
+                        const matchedDocs = documents.filter(doc => matchedDocIds.has(doc.id));
+                        console.log('[Webview] Matched documents:', matchedDocs);
+                        
+                        showSearchResults(matchedDocs, query, searchResults);
+                        console.log('[Webview] showSearchResults completed');
+                    } catch (error) {
+                        console.error('[Webview] Search results processing failed:', error);
+                        handleSearchError('Failed to process search results');
+                    }
+                }
+
+                function handleSearchError(errorMessage) {
+                    console.error('Search failed:', errorMessage);
+                    
+                    // Fallback to client-side search
+                    const query = currentSearchQuery;
+                    const matchedDocs = documents.filter(doc => 
+                        doc.title.toLowerCase().includes(query.toLowerCase()) ||
+                        (doc.metadata && JSON.stringify(doc.metadata).toLowerCase().includes(query.toLowerCase()))
+                    );
+                    
+                    showSearchResults(matchedDocs, query);
                 }
 
                 // Initialize event listeners
@@ -1327,15 +1416,10 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                         // Real-time search as user types (with debounce)
                         let searchTimeout;
                         queryInput.addEventListener('input', (event) => {
-                            clearTimeout(searchTimeout);
-                            searchTimeout = setTimeout(() => {
-                                const query = event.target.value.trim();
-                                if (query.length >= 2) {
-                                    performSearch();
-                                } else if (query.length === 0) {
-                                    clearSearchResults();
-                                }
-                            }, 300);
+                            const query = event.target.value.trim();
+                            if (query.length === 0) {
+                                clearSearchResults();
+                            }
                         });
                     }
 
