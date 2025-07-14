@@ -13,22 +13,65 @@ logger = setup_logger(__name__)
 class PDFExtractor:
     def __init__(self):
         self.section_patterns = [
+            # Abstract patterns
             r'^\s*abstract\s*$',
+            r'^\s*summary\s*$',
+            
+            # Introduction patterns
+            r'^\s*\d+\.?\s*introduction\s*$',
             r'^\s*introduction\s*$',
+            r'^\s*\d+\.?\s*background\s*$',
             r'^\s*background\s*$',
+            
+            # Related work patterns
+            r'^\s*\d+\.?\s*related\s+work\s*$',
             r'^\s*related\s+work\s*$',
+            r'^\s*\d+\.?\s*literature\s+review\s*$',
+            r'^\s*literature\s+review\s*$',
+            
+            # Methods patterns
+            r'^\s*\d+\.?\s*methodology?\s*$',
             r'^\s*methodology?\s*$',
+            r'^\s*\d+\.?\s*methods?\s*$',
             r'^\s*methods?\s*$',
+            r'^\s*\d+\.?\s*approach\s*$',
             r'^\s*approach\s*$',
+            r'^\s*\d+\.?\s*model\s*$',
+            r'^\s*model\s*$',
+            
+            # Experiments and results patterns
+            r'^\s*\d+\.?\s*experiments?\s*$',
             r'^\s*experiments?\s*$',
+            r'^\s*\d+\.?\s*results?\s*$',
             r'^\s*results?\s*$',
+            r'^\s*\d+\.?\s*evaluation\s*$',
             r'^\s*evaluation\s*$',
+            r'^\s*\d+\.?\s*analysis\s*$',
+            r'^\s*analysis\s*$',
+            
+            # Discussion patterns
+            r'^\s*\d+\.?\s*discussion\s*$',
             r'^\s*discussion\s*$',
-            r'^\s*conclusion\s*$',
+            r'^\s*\d+\.?\s*findings\s*$',
+            r'^\s*findings\s*$',
+            
+            # Conclusion patterns
+            r'^\s*\d+\.?\s*conclusions?\s*$',
+            r'^\s*conclusions?\s*$',
+            r'^\s*\d+\.?\s*future\s+work\s*$',
             r'^\s*future\s+work\s*$',
+            
+            # References patterns
             r'^\s*references?\s*$',
             r'^\s*bibliography\s*$',
-            r'^\s*appendix\s*$'
+            r'^\s*works?\s+cited\s*$',
+            
+            # Appendix patterns
+            r'^\s*appendix\s*[a-z]?\s*$',
+            r'^\s*[a-z]\.?\s*appendix\s*$',
+            
+            # Numbered sections (catch-all)
+            r'^\s*\d+\.?\s+[a-z][a-z\s]+$'
         ]
     
     def extract_content(self, pdf_path: str) -> Dict[str, Any]:
@@ -233,7 +276,7 @@ class PDFExtractor:
         return tables
     
     def _detect_structure(self, text_content: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Detect document structure and sections."""
+        """Enhanced document structure detection for academic papers."""
         structure = {
             'sections': [],
             'title': '',
@@ -244,36 +287,107 @@ class PDFExtractor:
         current_section = None
         
         for i, block in enumerate(text_content):
-            text = block['text'].lower().strip()
+            text = block['text'].strip()
+            text_lower = text.lower()
             block_type = block['type']
             
             # Extract title (usually first large text block)
             if not structure['title'] and block_type in ['title', 'heading']:
-                structure['title'] = block['text']
+                structure['title'] = text
             
-            # Detect section headings
-            if block_type == 'section_heading':
+            # Enhanced section detection - check both block type and patterns
+            is_section_heading = (
+                block_type == 'section_heading' or 
+                self._is_likely_section_heading(text, block)
+            )
+            
+            if is_section_heading:
                 if current_section:
                     current_section['end_index'] = i - 1
                 
                 current_section = {
-                    'title': block['text'],
+                    'title': text,
                     'start_index': i,
                     'page': block['page'],
-                    'type': self._categorize_section(text)
+                    'type': self._categorize_section(text_lower)
                 }
                 structure['sections'].append(current_section)
                 
                 # Special handling for abstract and references
-                if 'abstract' in text:
+                if 'abstract' in text_lower:
                     structure['abstract_start'] = i
-                elif 'reference' in text or 'bibliography' in text:
+                elif 'reference' in text_lower or 'bibliography' in text_lower:
                     structure['references_start'] = i
         
         # Close last section
         if current_section:
             current_section['end_index'] = len(text_content) - 1
         
+        # If we found very few sections, try a more aggressive approach
+        if len(structure['sections']) < 3:
+            structure = self._aggressive_section_detection(text_content, structure)
+        
+        return structure
+    
+    def _is_likely_section_heading(self, text: str, block: Dict) -> bool:
+        """More aggressive section heading detection."""
+        text_lower = text.lower().strip()
+        
+        # Check against patterns
+        for pattern in self.section_patterns:
+            if re.match(pattern, text_lower, re.IGNORECASE):
+                return True
+        
+        # Check for numbered sections (e.g., "3.1 Model Architecture")
+        if re.match(r'^\d+(\.\d+)*\.?\s+[A-Z][a-zA-Z\s]+', text):
+            return True
+        
+        # Check for ALL CAPS headings
+        if text.isupper() and len(text.split()) <= 4 and len(text) > 5:
+            return True
+        
+        # Check for bold text that looks like headings
+        font_info = block.get('font_info', [])
+        if font_info:
+            avg_size = sum(f.get('size', 0) for f in font_info) / len(font_info)
+            if avg_size > 12 and len(text.split()) <= 6:
+                return True
+        
+        return False
+    
+    def _aggressive_section_detection(self, text_content: List[Dict[str, Any]], structure: Dict) -> Dict:
+        """More aggressive section detection when normal detection fails."""
+        # Look for common academic paper patterns in content
+        sections = []
+        
+        for i, block in enumerate(text_content):
+            text = block['text'].strip()
+            text_lower = text.lower()
+            
+            # Look for text blocks that start with common section words
+            if any(text_lower.startswith(word) for word in [
+                'abstract', 'introduction', 'background', 'method', 'approach',
+                'experiment', 'result', 'evaluation', 'discussion', 'conclusion',
+                'reference', 'bibliography'
+            ]):
+                sections.append({
+                    'title': text,
+                    'start_index': i,
+                    'page': block['page'],
+                    'type': self._categorize_section(text_lower),
+                    'end_index': None
+                })
+        
+        # Set end indices
+        for j in range(len(sections)):
+            if j < len(sections) - 1:
+                sections[j]['end_index'] = sections[j + 1]['start_index'] - 1
+            else:
+                sections[j]['end_index'] = len(text_content) - 1
+        
+        if sections:
+            structure['sections'] = sections
+            
         return structure
     
     def _categorize_section(self, section_title: str) -> str:
