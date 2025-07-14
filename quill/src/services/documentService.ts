@@ -143,9 +143,12 @@ export class DocumentService {
         }
 
         const baseUrl = this.configManager.getRagServerUrl();
+        const deleteUrl = `${baseUrl}/api/documents/${documentId}`;
+        
+        console.log(`Attempting to delete document at URL: ${deleteUrl}`);
         
         try {
-            await axios.delete(`${baseUrl}/api/documents/${documentId}`, {
+            await axios.delete(deleteUrl, {
                 headers: {
                     'Authorization': `Bearer ${tokens.access_token}`
                 }
@@ -154,16 +157,22 @@ export class DocumentService {
             if (error.response?.status === 401) {
                 const refreshedTokens = await this.authService.refreshToken();
                 if (refreshedTokens) {
-                    await axios.delete(`${baseUrl}/api/documents/${documentId}`, {
-                        headers: {
-                            'Authorization': `Bearer ${refreshedTokens.access_token}`
-                        }
-                    });
+                    try {
+                        await axios.delete(`${baseUrl}/api/documents/${documentId}`, {
+                            headers: {
+                                'Authorization': `Bearer ${refreshedTokens.access_token}`
+                            }
+                        });
+                    } catch (retryError: any) {
+                        console.error('Delete retry failed:', retryError.response?.status, retryError.response?.data);
+                        throw new Error(`Failed to delete document: ${retryError.response?.status} - ${retryError.response?.data?.error || retryError.message}`);
+                    }
                 } else {
                     throw new Error('Authentication expired. Please login again.');
                 }
             } else {
-                throw new Error('Failed to delete document');
+                console.error('Delete failed:', error.response?.status, error.response?.data, error.config?.url);
+                throw new Error(`Failed to delete document: ${error.response?.status} - ${error.response?.data?.error || error.message}`);
             }
         }
     }

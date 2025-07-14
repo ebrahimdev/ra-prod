@@ -137,8 +137,10 @@ def get_documents():
 @require_auth
 def get_document(document_id):
     """Get a specific document with its chunks."""
+    logger.info(f"GET request received for document_id: {document_id}")
     try:
         user_id = request.current_user['id']
+        logger.info(f"User {user_id} requesting document {document_id}")
         
         db = get_db()
         try:
@@ -146,6 +148,7 @@ def get_document(document_id):
             document = document_service.get_document(user_id, document_id)
             
             if not document:
+                logger.warning(f"Document {document_id} not found for user {user_id}")
                 return jsonify({"error": "Document not found"}), 404
             
             # Get chunks
@@ -189,8 +192,10 @@ def get_document(document_id):
 @require_auth
 def delete_document(document_id):
     """Delete a document and all its chunks."""
+    logger.info(f"DELETE request received for document_id: {document_id}")
     try:
         user_id = request.current_user['id']
+        logger.info(f"User {user_id} attempting to delete document {document_id}")
         
         db = get_db()
         try:
@@ -198,15 +203,17 @@ def delete_document(document_id):
             success = document_service.delete_document(user_id, document_id)
             
             if not success:
+                logger.warning(f"Document {document_id} not found for user {user_id}")
                 return jsonify({"error": "Document not found"}), 404
             
+            logger.info(f"Document {document_id} successfully deleted for user {user_id}")
             return jsonify({"message": "Document deleted successfully"})
             
         finally:
             db.close()
             
     except Exception as e:
-        logger.error(f"Error deleting document: {str(e)}")
+        logger.error(f"Error deleting document {document_id}: {str(e)}")
         return jsonify({"error": "Failed to delete document"}), 500
 
 @doc_bp.route('/search', methods=['POST'])

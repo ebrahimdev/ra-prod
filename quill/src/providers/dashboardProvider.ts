@@ -1150,18 +1150,25 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
                 function simulateUploadProgress(filePath) {
                     let progress = 0;
+                    const targetTime = 60000; // 60 seconds to reach 95%
+                    const updateInterval = 500; // Update every 500ms
+                    const totalUpdates = targetTime / updateInterval; // 120 updates
+                    const progressPerUpdate = 95 / totalUpdates; // ~0.79% per update
+                    
                     const interval = setInterval(() => {
-                        progress += Math.random() * 15; // Random progress increments
-                        if (progress > 95) {
-                            progress = 95; // Stop at 95% until actual completion
-                        }
+                        // Add some randomness while maintaining consistent timing
+                        const randomVariance = (Math.random() - 0.5) * 0.3; // ±0.15%
+                        progress += progressPerUpdate + randomVariance;
+                        
+                        // Ensure we don't exceed 95% or go backwards
+                        progress = Math.min(Math.max(progress, 0), 95);
                         
                         updateProgressBar(filePath, progress);
                         
                         if (progress >= 95) {
                             clearInterval(interval);
                         }
-                    }, 200);
+                    }, updateInterval);
                 }
 
                 function updateProgressBar(filePath, progress) {
@@ -1375,18 +1382,25 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 
                 function simulateUploadProgressFromPoint(filePath, startProgress) {
                     let progress = Math.max(startProgress, 0);
+                    const targetTime = 60000; // 60 seconds total target time
+                    const updateInterval = 500; // Update every 500ms
+                    const totalUpdates = targetTime / updateInterval; // 120 updates
+                    const progressPerUpdate = 95 / totalUpdates; // ~0.79% per update
+                    
                     const interval = setInterval(() => {
-                        progress += Math.random() * 10;
-                        if (progress > 95) {
-                            progress = 95;
-                        }
+                        // Add some randomness while maintaining consistent timing
+                        const randomVariance = (Math.random() - 0.5) * 0.3; // ±0.15%
+                        progress += progressPerUpdate + randomVariance;
+                        
+                        // Ensure we don't exceed 95% or go backwards
+                        progress = Math.min(Math.max(progress, startProgress), 95);
                         
                         updateProgressBar(filePath, progress);
                         
                         if (progress >= 95) {
                             clearInterval(interval);
                         }
-                    }, 300);
+                    }, updateInterval);
                 }
 
                 // Initialize
