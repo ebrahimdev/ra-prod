@@ -7,6 +7,7 @@ from ..models.document import Document, DocumentChunk
 from ..pdf.extractor import PDFExtractor
 from ..pdf.chunker import DocumentChunker
 from ..vectorization.embeddings import EmbeddingService
+from ..llm.client import OpenChatClient
 from ..utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -17,10 +18,10 @@ class DocumentService:
         self.pdf_extractor = PDFExtractor()
         self.chunker = DocumentChunker()
         self.embedding_service = EmbeddingService()
+        self.llm_client = OpenChatClient()
     
     def upload_document(self, user_id: int, file_path: str, filename: str) -> Document:
         """Upload and process a new document."""
-        logger.info(f"Starting document upload for user {user_id}: {filename}")
         
         try:
             # Calculate file hash for deduplication
@@ -34,7 +35,6 @@ class DocumentService:
             ).first()
             
             if existing_doc:
-                logger.info(f"Document already exists: {existing_doc.id}")
                 return existing_doc
             
             # Create document record
@@ -54,7 +54,6 @@ class DocumentService:
             self._process_document(document, file_path)
             
             self.db.commit()
-            logger.info(f"Document uploaded successfully: {document.id}")
             return document
             
         except Exception as e:
@@ -88,7 +87,6 @@ class DocumentService:
             # Delete associated chunks and images (cascade should handle this)
             self.db.delete(document)
             self.db.commit()
-            logger.info(f"Document deleted: {document_id}")
             return True
             
         except Exception as e:
@@ -96,34 +94,26 @@ class DocumentService:
             logger.error(f"Error deleting document: {str(e)}")
             return False
     
-    def search_documents(self, user_id: int, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
-        """Search through user's documents using semantic similarity."""
-        logger.info(f"Searching documents for user {user_id}: '{query}' (top_k: {top_k})")
+    def search_documents(self, user_id: int, query: str, top_k: int = 10) -> Dict[str, Any]:
+        """Search through user's documents using semantic similarity and generate LLM response."""
         
         try:
             # Generate query embedding
-            logger.info("Generating query embedding")
             query_embedding = self.embedding_service.embed_text(query)
-            logger.info(f"Query embedding generated, shape: {len(query_embedding) if query_embedding else 'None'}")
             
             # Get all chunks for the user's documents
-            logger.info("Querying database for user's document chunks")
             chunks = self.db.query(DocumentChunk).join(Document).filter(
                 Document.user_id == user_id,
                 Document.status == 'completed'
             ).all()
             
-            logger.info(f"Found {len(chunks)} chunks for user {user_id}")
-            
             if not chunks:
                 logger.warning(f"No chunks found for user {user_id}")
-                return []
-            
-            # Log document count and status
-            documents = self.db.query(Document).filter_by(user_id=user_id).all()
-            logger.info(f"User has {len(documents)} total documents")
-            completed_docs = [d for d in documents if d.status == 'completed']
-            logger.info(f"User has {len(completed_docs)} completed documents")
+                return {
+                    'results': [],
+                    'llm_response': 'No documents found in your library. Please upload some papers first.',
+                    'query': query
+                }
             
             # Calculate similarities
             results = []
@@ -140,8 +130,6 @@ class DocumentService:
                             query_embedding, chunk_embedding
                         )
                         
-                        logger.debug(f"Chunk {chunk.id} similarity: {similarity:.4f}")
-                        
                         results.append({
                             'chunk_id': chunk.id,
                             'document_id': chunk.document_id,
@@ -155,29 +143,95 @@ class DocumentService:
                         })
                     except Exception as e:
                         logger.warning(f"Error processing chunk {chunk.id}: {str(e)}")
-                else:
-                    logger.debug(f"Chunk {chunk.id} has no embedding vector")
             
-            logger.info(f"Processed {processed_chunks} chunks, {chunks_with_embeddings} had embeddings")
-            logger.info(f"Generated {len(results)} similarity results")
-            
-            # Sort by similarity and return top results
+            # Sort by similarity and get top results
             results.sort(key=lambda x: x['similarity'], reverse=True)
             top_results = results[:top_k]
             
-            if top_results:
-                logger.info(f"Top result similarity: {top_results[0]['similarity']:.4f}")
-                logger.info(f"Returning top {len(top_results)} results")
-            else:
-                logger.warning("No results to return")
+            if not top_results:
+                return {
+                    'results': [],
+                    'llm_response': 'No relevant content found for your query. Try rephrasing or using different keywords.',
+                    'query': query
+                }
             
-            return top_results
+            # Generate LLM response using top results
+            llm_response = self._generate_search_response(query, top_results)
+            
+            return {
+                'results': top_results,
+                'llm_response': llm_response,
+                'query': query
+            }
             
         except Exception as e:
             logger.error(f"Error searching documents: {str(e)}")
             import traceback
             logger.error(f"Search error traceback: {traceback.format_exc()}")
-            return []
+            return {
+                'results': [],
+                'llm_response': 'An error occurred while searching your documents. Please try again.',
+                'query': query
+            }
+    
+    def _generate_search_response(self, query: str, search_results: List[Dict[str, Any]]) -> str:
+        """Generate an LLM response based on search results and user query."""
+        try:
+            # Build context from search results
+            context_chunks = []
+            for i, result in enumerate(search_results[:5]):  # Use top 5 results for context
+                chunk_content = result['content'][:500]  # Truncate long chunks
+                document_title = result['document_title']
+                page_num = result.get('page_number', 'N/A')
+                section = result.get('section_title', '')
+                
+                reference = f"[{document_title}"
+                if page_num != 'N/A':
+                    reference += f", p.{page_num}"
+                if section:
+                    reference += f", {section}"
+                reference += "]"
+                
+                context_chunks.append(f"{i+1}. {reference}: {chunk_content}")
+            
+            context = "\n\n".join(context_chunks)
+            
+            # Create prompt for LLM
+            messages = [
+                {
+                    "role": "system",
+                    "content": """You are a research assistant helping a user search through their academic paper library. 
+                    Based on the provided context from their papers, answer their question in 1-3 well-structured paragraphs.
+                    Use inline citations referencing the papers by their titles and page numbers where appropriate.
+                    Be concise but informative, focusing on directly addressing the user's question.
+                    
+                    IMPORTANT: Format your response using Markdown. Use **bold** for emphasis, *italics* for terms, 
+                    and proper formatting for readability. This helps the frontend display the content properly."""
+                },
+                {
+                    "role": "user",
+                    "content": f"""The user is searching their paper library with this query: "{query}"
+
+Here are the most relevant excerpts from their papers:
+
+{context}
+
+Please provide a comprehensive answer to their query based on this information from their library. Use inline references like [Paper Title, p.X] when citing specific information. Format your response in Markdown."""
+                }
+            ]
+            
+            # Call LLM
+            response = self.llm_client.chat_completion(
+                messages=messages,
+                max_tokens=800,
+                temperature=0.1
+            )
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"Error generating LLM response: {str(e)}")
+            return f"Based on your search for '{query}', I found {len(search_results)} relevant excerpts from your papers, but couldn't generate a detailed response. Please check the search results below for relevant information."
     
     def get_document_chunks(self, user_id: int, document_id: int) -> List[DocumentChunk]:
         """Get all chunks for a specific document."""
@@ -196,7 +250,6 @@ class DocumentService:
             self.db.commit()
             
             # Extract content from PDF
-            logger.info(f"Extracting content from document {document.id}")
             extracted_content = self.pdf_extractor.extract_content(file_path)
             
             # Extract actual title from PDF metadata or content
@@ -207,7 +260,6 @@ class DocumentService:
                     document.title = pdf_title[:57] + "..."
                 else:
                     document.title = pdf_title
-                logger.info(f"Updated document title to: {document.title}")
             
             # Update document metadata
             document.doc_metadata = {
@@ -218,11 +270,9 @@ class DocumentService:
             }
             
             # Create chunks
-            logger.info(f"Creating chunks for document {document.id}")
             chunks = self.chunker.chunk_document(extracted_content)
             
             # Generate embeddings and store chunks
-            logger.info(f"Generating embeddings for {len(chunks)} chunks")
             for chunk_data in chunks:
                 try:
                     # Generate embedding for the chunk
@@ -254,12 +304,10 @@ class DocumentService:
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logger.info(f"Cleaned up uploaded file: {file_path}")
             except Exception as cleanup_error:
                 logger.warning(f"Failed to clean up uploaded file {file_path}: {str(cleanup_error)}")
             
             self.db.commit()
-            logger.info(f"Document processing completed: {document.id}")
             
         except Exception as e:
             document.status = 'failed'
@@ -268,7 +316,6 @@ class DocumentService:
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logger.info(f"Cleaned up uploaded file after failure: {file_path}")
             except Exception as cleanup_error:
                 logger.warning(f"Failed to clean up uploaded file {file_path}: {str(cleanup_error)}")
             

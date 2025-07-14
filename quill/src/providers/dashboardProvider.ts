@@ -3,6 +3,7 @@ import * as path from 'path';
 import { DocumentService, Document } from '../services/documentService';
 import { AuthService } from '../services/authService';
 import { RagProvider } from './ragProvider';
+import { SearchResultsEditorProvider } from './searchResultsEditorProvider';
 
 export class DashboardProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'quill.dashboard';
@@ -323,17 +324,21 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
             console.log(`[Dashboard] Starting search for query: "${query}"`);
             const searchResponse = await this.documentService.searchDocuments(query);
             
-            console.log(`[Dashboard] Search completed. Results count: ${searchResponse.count}`);
-            console.log(`[Dashboard] Search results:`, searchResponse.results);
+            console.log(`[Dashboard] Search completed. Results count: ${searchResponse.results.length}`);
+            console.log(`[Dashboard] LLM response:`, searchResponse.llm_response);
             
+            // Send results to dashboard (keeping backward compatibility)
             this._view?.webview.postMessage({
                 command: 'searchResults',
                 results: searchResponse.results,
                 query: query,
-                count: searchResponse.count
+                count: searchResponse.results.length
             });
             
-            console.log(`[Dashboard] Sent searchResults message to webview`);
+            // Open LLM response in editor tab instead of raw results
+            await SearchResultsEditorProvider.openSearchResults(query, searchResponse.llm_response);
+            
+            console.log(`[Dashboard] Sent searchResults message to webview and opened LLM response editor`);
         } catch (error: any) {
             console.error(`[Dashboard] Search error:`, error);
             this._view?.webview.postMessage({

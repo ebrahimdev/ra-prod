@@ -17,7 +17,6 @@ def create_app():
     app.register_blueprint(doc_bp)
     
     logger = setup_logger(__name__)
-    logger.info("RAG server initialized with PDF processing capabilities")
     
     return app
 

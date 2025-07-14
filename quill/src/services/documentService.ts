@@ -36,7 +36,7 @@ export interface SearchResult {
 export interface SearchResponse {
     query: string;
     results: SearchResult[];
-    count: number;
+    llm_response: string;
 }
 
 export class DocumentService {

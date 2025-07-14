@@ -39,7 +39,6 @@ class DocumentChunker:
     
     def chunk_document(self, extracted_content: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Create semantic chunks from extracted PDF content using efficient batching."""
-        logger.info("Starting optimized document chunking process")
         
         chunks = []
         text_content = extracted_content['text_content']
@@ -81,7 +80,6 @@ class DocumentChunker:
         # Log chunk distribution
         self._log_chunk_statistics(chunks)
         
-        logger.info(f"Created {len(chunks)} optimized chunks from document")
         return chunks
     
     def _create_semantic_chunks(self, text_content: List[Dict], structure: Dict) -> List[Dict[str, Any]]:
@@ -619,7 +617,6 @@ class DocumentChunker:
             
             # Skip micro-chunks (too small to be useful)
             if word_count < self.min_chunk_size // 10:  # ~10 words minimum
-                logger.debug(f"Skipping micro-chunk with {word_count} words")
                 continue
             
             # Skip chunks that are just whitespace or special characters
@@ -660,12 +657,9 @@ class DocumentChunker:
         
         total_chunks = len(chunks)
         
-        logger.info("Chunk distribution:")
         for chunk_type, count in type_counts.items():
             percentage = (count / total_chunks) * 100
-            logger.info(f"  {chunk_type}: {count} chunks ({percentage:.1f}%)")
         
-        logger.info(f"Total words: {total_words}, Average words per chunk: {total_words/total_chunks:.1f}")
         
         # Check if distribution is balanced
         text_ratio = type_counts.get("text", 0) / total_chunks

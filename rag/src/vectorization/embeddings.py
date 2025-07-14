@@ -13,8 +13,6 @@ class EmbeddingService:
             self.model = SentenceTransformer(model_name)
             self.model_name = model_name
             self.embedding_dim = self.model.get_sentence_embedding_dimension()
-            logger.info(f"Embedding service initialized with model: {model_name}")
-            logger.info(f"Embedding dimension: {self.embedding_dim}")
         except Exception as e:
             logger.error(f"Failed to initialize embedding model: {str(e)}")
             raise

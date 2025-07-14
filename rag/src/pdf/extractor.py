@@ -76,7 +76,6 @@ class PDFExtractor:
     
     def extract_content(self, pdf_path: str) -> Dict[str, Any]:
         """Extract all content from PDF including text, images, and metadata."""
-        logger.info(f"Starting PDF extraction for: {pdf_path}")
         
         result = {
             'text_content': [],
@@ -114,9 +113,6 @@ class PDFExtractor:
             # Detect document structure
             result['structure'] = self._detect_structure(result['text_content'])
             
-            logger.info(f"Extraction complete. Pages: {result['page_count']}, "
-                       f"Text blocks: {len(result['text_content'])}, "
-                       f"Images: {len(result['images'])}")
             
             return result
             

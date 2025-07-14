@@ -28,7 +28,6 @@ def create_app():
         db.create_all()
     
     logger = setup_logger(__name__)
-    logger.info("Auth server initialized")
     
     return app
 

@@ -11,14 +11,12 @@ def require_auth(f):
     def decorated_function(*args, **kwargs):
         try:
             auth_header = request.headers.get('Authorization')
-            logger.info(f"Auth header received: {auth_header}")
             
             if not auth_header or not auth_header.startswith('Bearer '):
                 logger.error("Authorization header missing or invalid")
                 return jsonify({"error": "Authorization header missing or invalid"}), 401
             
             token = auth_header.split(' ')[1]
-            logger.info(f"Token extracted: {token[:20]}...")
             
             auth_server_url = "http://localhost:8001"
             response = requests.get(
@@ -26,8 +24,6 @@ def require_auth(f):
                 headers={"Authorization": f"Bearer {token}"}
             )
             
-            logger.info(f"Auth server response status: {response.status_code}")
-            logger.info(f"Auth server response body: {response.text}")
             
             if response.status_code != 200:
                 logger.error(f"Auth server returned {response.status_code}: {response.text}")
@@ -35,7 +31,6 @@ def require_auth(f):
             
             user_data = response.json()["user"]
             request.current_user = user_data
-            logger.info(f"User authenticated: {user_data['email']}")
             
             return f(*args, **kwargs)
             

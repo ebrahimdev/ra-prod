@@ -137,10 +137,8 @@ def get_documents():
 @require_auth
 def get_document(document_id):
     """Get a specific document with its chunks."""
-    logger.info(f"GET request received for document_id: {document_id}")
     try:
         user_id = request.current_user['id']
-        logger.info(f"User {user_id} requesting document {document_id}")
         
         db = get_db()
         try:
@@ -192,10 +190,8 @@ def get_document(document_id):
 @require_auth
 def delete_document(document_id):
     """Delete a document and all its chunks."""
-    logger.info(f"DELETE request received for document_id: {document_id}")
     try:
         user_id = request.current_user['id']
-        logger.info(f"User {user_id} attempting to delete document {document_id}")
         
         db = get_db()
         try:
@@ -206,7 +202,6 @@ def delete_document(document_id):
                 logger.warning(f"Document {document_id} not found for user {user_id}")
                 return jsonify({"error": "Document not found"}), 404
             
-            logger.info(f"Document {document_id} successfully deleted for user {user_id}")
             return jsonify({"message": "Document deleted successfully"})
             
         finally:
@@ -222,10 +217,8 @@ def search_documents():
     """Search through user's documents using semantic similarity."""
     try:
         user_id = request.current_user['id']
-        logger.info(f"Search request from user {user_id}")
         
         data = request.get_json()
-        logger.info(f"Search request data: {data}")
         
         if not data or 'query' not in data:
             logger.warning("Search request missing query parameter")
@@ -233,28 +226,18 @@ def search_documents():
         
         query = data['query']
         top_k = data.get('top_k', 10)
-        logger.info(f"Searching for query: '{query}' with top_k: {top_k}")
         
         db = get_db()
         try:
             document_service = DocumentService(db)
-            logger.info("Created document service, calling search_documents")
-            results = document_service.search_documents(user_id, query, top_k)
-            logger.info(f"Search completed. Found {len(results)} results")
+            search_response = document_service.search_documents(user_id, query, top_k)
             
-            if results:
-                logger.info(f"First result sample: {results[0] if results else 'None'}")
+            if search_response.get('results'):
+                logger.info(f"Found {len(search_response['results'])} search results")
             else:
                 logger.warning("No search results found")
             
-            response_data = {
-                "query": query,
-                "results": results,
-                "count": len(results)
-            }
-            logger.info(f"Returning response with {len(results)} results")
-            
-            return jsonify(response_data)
+            return jsonify(search_response)
             
         finally:
             db.close()
@@ -311,7 +294,6 @@ def clear_all_documents():
                 response_data["warning"] = f"Failed to delete {len(failed_deletions)} document(s)"
                 response_data["failed_documents"] = failed_deletions
             
-            logger.info(f"User {user_id} cleared their library: {deleted_count}/{len(documents)} documents deleted")
             
             return jsonify(response_data)
             
