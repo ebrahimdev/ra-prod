@@ -1,7 +1,8 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, JSON, Enum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+import enum
 
 Base = declarative_base()
 
@@ -56,3 +57,31 @@ class DocumentImage(Base):
     # Relationships
     document = relationship("Document")
     chunk = relationship("DocumentChunk")
+
+class MessageRole(enum.Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+class ChatSession(Base):
+    __tablename__ = 'chat_sessions'
+    
+    id = Column(String(36), primary_key=True)  # UUID
+    user_id = Column(Integer, nullable=False)
+    title = Column(String(500), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship to messages
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    __tablename__ = 'chat_messages'
+    
+    id = Column(String(36), primary_key=True)  # UUID
+    session_id = Column(String(36), ForeignKey('chat_sessions.id'), nullable=False)
+    role = Column(Enum(MessageRole), nullable=False)
+    content = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship back to session
+    session = relationship("ChatSession", back_populates="messages")

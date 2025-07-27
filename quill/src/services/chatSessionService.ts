@@ -23,6 +23,13 @@ export interface ChatResponse {
     message: string;
     timestamp: string;
     user_message: string;
+    user_message_id?: string;
+    assistant_message_id?: string;
+}
+
+export interface SendMessageResult {
+    assistantMessage: ChatMessage;
+    sessionId: string;
 }
 
 export class ChatSessionService {
@@ -55,31 +62,106 @@ export class ChatSessionService {
     }
 
     /**
-     * Save chat session to VSCode global state
-     */
-    private async saveSession(session: ChatSession): Promise<void> {
-        const sessions = await this.getAllSessions();
-        sessions[session.id] = session;
-        await this.context.globalState.update('quill.chatSessions', sessions);
-    }
-
-    /**
-     * Get all chat sessions from VSCode global state
+     * Get all chat sessions from backend API
      */
     async getAllSessions(): Promise<{[sessionId: string]: ChatSession}> {
-        return this.context.globalState.get('quill.chatSessions', {});
+        const tokens = await this.authService.getStoredTokens();
+        
+        if (!tokens) {
+            throw new Error('Not authenticated. Please login first.');
+        }
+
+        const baseUrl = this.configManager.getRagServerUrl();
+        
+        try {
+            const response = await axios.get(`${baseUrl}/api/chat/sessions`, {
+                headers: {
+                    'Authorization': `Bearer ${tokens.access_token}`
+                }
+            });
+
+            const sessions: {[sessionId: string]: ChatSession} = {};
+            response.data.sessions.forEach((session: any) => {
+                sessions[session.id] = {
+                    id: session.id,
+                    messages: [], // Will be loaded when needed
+                    createdAt: session.created_at,
+                    lastActivity: session.last_activity,
+                    title: session.title
+                };
+            });
+
+            return sessions;
+
+        } catch (error: any) {
+            if (error.response?.status === 401) {
+                const refreshedTokens = await this.authService.refreshToken();
+                if (refreshedTokens) {
+                    return this.getAllSessions(); // Retry
+                } else {
+                    throw new Error('Authentication expired. Please login again.');
+                }
+            }
+            
+            const errorMessage = error.response?.data?.error || error.message || 'Failed to retrieve chat sessions';
+            throw new Error(errorMessage);
+        }
     }
 
     /**
-     * Get a specific chat session by ID
+     * Get a specific chat session by ID from backend API
      */
     async getSession(sessionId: string): Promise<ChatSession | null> {
-        const sessions = await this.getAllSessions();
-        return sessions[sessionId] || null;
+        const tokens = await this.authService.getStoredTokens();
+        
+        if (!tokens) {
+            throw new Error('Not authenticated. Please login first.');
+        }
+
+        const baseUrl = this.configManager.getRagServerUrl();
+        
+        try {
+            const response = await axios.get(`${baseUrl}/api/chat/sessions/${sessionId}`, {
+                headers: {
+                    'Authorization': `Bearer ${tokens.access_token}`
+                }
+            });
+
+            const sessionData = response.data;
+            return {
+                id: sessionData.id,
+                messages: sessionData.messages.map((msg: any) => ({
+                    id: msg.id,
+                    role: msg.role as 'user' | 'assistant',
+                    content: msg.content,
+                    timestamp: msg.timestamp
+                })),
+                createdAt: sessionData.created_at,
+                lastActivity: sessionData.last_activity,
+                title: sessionData.title
+            };
+
+        } catch (error: any) {
+            if (error.response?.status === 404) {
+                return null; // Session not found
+            }
+            
+            if (error.response?.status === 401) {
+                const refreshedTokens = await this.authService.refreshToken();
+                if (refreshedTokens) {
+                    return this.getSession(sessionId); // Retry
+                } else {
+                    throw new Error('Authentication expired. Please login again.');
+                }
+            }
+            
+            const errorMessage = error.response?.data?.error || error.message || 'Failed to retrieve chat session';
+            throw new Error(errorMessage);
+        }
     }
 
     /**
-     * Create a new chat session
+     * Create a new chat session (backend will create it when first message is sent)
      */
     async createSession(initialMessage?: string): Promise<ChatSession> {
         const sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -93,55 +175,26 @@ export class ChatSessionService {
             title: initialMessage ? this.generateSessionTitle(initialMessage) : 'New Chat'
         };
 
-        await this.saveSession(session);
+        // Note: Session will be created in backend when first message is sent
         return session;
     }
 
     /**
-     * Send a message to the chat API and update the session
+     * Send a message to the chat API (backend handles session and message storage)
      */
-    async sendMessage(sessionId: string, userMessage: string): Promise<ChatMessage> {
+    async sendMessage(sessionId: string, userMessage: string): Promise<SendMessageResult> {
         const tokens = await this.authService.getStoredTokens();
         
         if (!tokens) {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const session = await this.getSession(sessionId);
-        if (!session) {
-            throw new Error('Chat session not found');
-        }
-
         const baseUrl = this.configManager.getRagServerUrl();
         
         try {
-            // Create user message
-            const userChatMessage: ChatMessage = {
-                id: this.generateMessageId(),
-                role: 'user',
-                content: userMessage,
-                timestamp: new Date().toISOString()
-            };
-
-            // Add user message to session
-            session.messages.push(userChatMessage);
-            session.lastActivity = new Date().toISOString();
-            
-            // Update title if this is the first message
-            if (session.messages.length === 1) {
-                session.title = this.generateSessionTitle(userMessage);
-            }
-
-            // Prepare chat history for API (exclude current message)
-            const chatHistory = session.messages.slice(0, -1).map(msg => ({
-                role: msg.role,
-                content: msg.content
-            }));
-
             const response = await axios.post(`${baseUrl}/api/chat/message`, {
                 message: userMessage,
-                session_id: sessionId,
-                chat_history: chatHistory
+                session_id: sessionId === 'new' || sessionId.startsWith('session-') ? undefined : sessionId // Let backend create new session if needed
             }, {
                 headers: {
                     'Authorization': `Bearer ${tokens.access_token}`,
@@ -151,22 +204,18 @@ export class ChatSessionService {
 
             const chatResponse: ChatResponse = response.data;
 
-            // Create assistant message
+            // Return the assistant message and real session ID
             const assistantMessage: ChatMessage = {
-                id: this.generateMessageId(),
+                id: chatResponse.assistant_message_id || this.generateMessageId(),
                 role: 'assistant',
                 content: chatResponse.message,
                 timestamp: chatResponse.timestamp
             };
 
-            // Add assistant message to session
-            session.messages.push(assistantMessage);
-            session.lastActivity = chatResponse.timestamp;
-
-            // Save updated session
-            await this.saveSession(session);
-
-            return assistantMessage;
+            return {
+                assistantMessage,
+                sessionId: chatResponse.session_id
+            };
 
         } catch (error: any) {
             if (error.response?.status === 401) {
@@ -186,31 +235,47 @@ export class ChatSessionService {
     }
 
     /**
-     * Delete a chat session
+     * Delete a chat session via backend API
      */
     async deleteSession(sessionId: string): Promise<void> {
-        const sessions = await this.getAllSessions();
-        delete sessions[sessionId];
-        await this.context.globalState.update('quill.chatSessions', sessions);
+        const tokens = await this.authService.getStoredTokens();
+        
+        if (!tokens) {
+            throw new Error('Not authenticated. Please login first.');
+        }
+
+        const baseUrl = this.configManager.getRagServerUrl();
+        
+        try {
+            await axios.delete(`${baseUrl}/api/chat/sessions/${sessionId}`, {
+                headers: {
+                    'Authorization': `Bearer ${tokens.access_token}`
+                }
+            });
+
+        } catch (error: any) {
+            if (error.response?.status === 401) {
+                const refreshedTokens = await this.authService.refreshToken();
+                if (refreshedTokens) {
+                    return this.deleteSession(sessionId); // Retry
+                } else {
+                    throw new Error('Authentication expired. Please login again.');
+                }
+            }
+            
+            const errorMessage = error.response?.data?.error || error.message || 'Failed to delete chat session';
+            throw new Error(errorMessage);
+        }
     }
 
     /**
-     * Clear all chat sessions
-     */
-    async clearAllSessions(): Promise<void> {
-        await this.context.globalState.update('quill.chatSessions', {});
-    }
-
-    /**
-     * Get recent sessions (last 10)
+     * Get recent sessions (last 20)
      */
     async getRecentSessions(): Promise<ChatSession[]> {
         const sessions = await this.getAllSessions();
         const sessionList = Object.values(sessions);
         
-        // Sort by last activity, most recent first
-        sessionList.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
-        
-        return sessionList.slice(0, 10);
+        // Sessions are already sorted by last activity from backend
+        return sessionList.slice(0, 20);
     }
 }

@@ -27,6 +27,13 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(DashboardProvider.viewType, dashboardProvider)
     );
 
+    // Register refresh chat sessions command
+    const refreshChatSessionsDisposable = vscode.commands.registerCommand(
+        'quill.refreshChatSessions',
+        () => dashboardProvider.refreshChatSessions()
+    );
+    context.subscriptions.push(refreshChatSessionsDisposable);
+
     // Register the status bar provider
     const statusBarProvider = new StatusBarProvider(context);
     context.subscriptions.push({

@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
-import { ChatSessionService, ChatSession, ChatMessage } from '../services/chatSessionService';
+import { ChatSessionService, ChatSession, ChatMessage, SendMessageResult } from '../services/chatSessionService';
 
 export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
     public static readonly viewType = 'quill.chatEditor';
+
+    // Track open chat session panels to prevent duplicates
+    private static openPanels = new Map<string, vscode.WebviewPanel>();
 
     private chatSessionService: ChatSessionService;
 
@@ -11,25 +14,57 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
     }
 
     /**
-     * Open a new chat session in an editor
+     * Open a chat session in an editor (new or existing)
      */
     public static async openChatSession(
         context: vscode.ExtensionContext, 
-        initialMessage?: string
+        initialMessage?: string,
+        existingSessionId?: string
     ): Promise<vscode.WebviewPanel> {
         const chatSessionService = new ChatSessionService(context);
-        const session = await chatSessionService.createSession(initialMessage);
+        let session: ChatSession;
+        
+        if (existingSessionId) {
+            // Check if this session already has an open panel
+            const existingPanel = ChatEditorProvider.openPanels.get(existingSessionId);
+            if (existingPanel) {
+                // Focus the existing panel instead of creating a new one
+                existingPanel.reveal(vscode.ViewColumn.Active);
+                return existingPanel;
+            }
+            
+            // Try to load existing session
+            const existingSession = await chatSessionService.getSession(existingSessionId);
+            if (!existingSession) {
+                throw new Error('Chat session not found');
+            }
+            session = existingSession;
+        } else {
+            // Create new session
+            session = await chatSessionService.createSession(initialMessage);
+        }
         
         // Create webview panel directly
         const panel = vscode.window.createWebviewPanel(
             'quillChat',
             `Chat: ${session.title}`,
-            vscode.ViewColumn.Beside,
+            vscode.ViewColumn.Active,
             {
                 enableScripts: true,
                 retainContextWhenHidden: true
             }
         );
+
+        // Add panel to tracking
+        ChatEditorProvider.openPanels.set(session.id, panel);
+
+        // Track the current session ID (may change for new sessions)
+        let currentSessionId = session.id;
+        
+        // Clean up tracking when panel is disposed
+        panel.onDidDispose(() => {
+            ChatEditorProvider.openPanels.delete(currentSessionId);
+        });
 
         // Create provider instance to handle the webview
         const provider = new ChatEditorProvider(context);
@@ -42,10 +77,17 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
             async (message) => {
                 switch (message.command) {
                     case 'sendMessage':
-                        await provider.handleSendMessage(panel, session.id, message.text);
+                        // Update session ID when it changes (for new sessions)
+                        const newSessionId = await provider.handleSendMessage(panel, currentSessionId, message.text);
+                        if (newSessionId !== currentSessionId) {
+                            // Session ID changed, update tracking
+                            ChatEditorProvider.openPanels.delete(currentSessionId);
+                            ChatEditorProvider.openPanels.set(newSessionId, panel);
+                            currentSessionId = newSessionId;
+                        }
                         break;
                     case 'loadSession':
-                        await provider.handleLoadSession(panel, session.id);
+                        await provider.handleLoadSession(panel, currentSessionId);
                         break;
                 }
             },
@@ -53,10 +95,16 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
             context.subscriptions
         );
 
-        // If there's an initial message, send it automatically
-        if (initialMessage) {
+        // If there's an initial message and this is a new session, send it automatically
+        if (initialMessage && !existingSessionId) {
             setTimeout(async () => {
-                await provider.handleSendMessage(panel, session.id, initialMessage);
+                const newSessionId = await provider.handleSendMessage(panel, currentSessionId, initialMessage);
+                if (newSessionId !== currentSessionId) {
+                    // Session ID changed, update tracking
+                    ChatEditorProvider.openPanels.delete(currentSessionId);
+                    ChatEditorProvider.openPanels.set(newSessionId, panel);
+                    currentSessionId = newSessionId;
+                }
             }, 500);
         }
 
@@ -96,15 +144,18 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
         // Set initial HTML
         webviewPanel.webview.html = this.getWebviewContent(webviewPanel.webview, session);
 
+        // Track the current session ID
+        let currentSessionId = sessionId;
+
         // Handle messages from the webview
         webviewPanel.webview.onDidReceiveMessage(
             async (message) => {
                 switch (message.command) {
                     case 'sendMessage':
-                        await this.handleSendMessage(webviewPanel, sessionId, message.text);
+                        currentSessionId = await this.handleSendMessage(webviewPanel, currentSessionId, message.text);
                         break;
                     case 'loadSession':
-                        await this.handleLoadSession(webviewPanel, sessionId);
+                        await this.handleLoadSession(webviewPanel, currentSessionId);
                         break;
                 }
             },
@@ -123,7 +174,7 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
         webviewPanel: vscode.WebviewPanel, 
         sessionId: string, 
         userMessage: string
-    ): Promise<void> {
+    ): Promise<string> {
         try {
             // Show loading state
             webviewPanel.webview.postMessage({
@@ -132,10 +183,11 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
             });
 
             // Send message to API
-            const assistantMessage = await this.chatSessionService.sendMessage(sessionId, userMessage);
+            const result = await this.chatSessionService.sendMessage(sessionId, userMessage);
+            const realSessionId = result.sessionId;
             
-            // Get updated session
-            const session = await this.chatSessionService.getSession(sessionId);
+            // Get updated session using the real session ID
+            const session = await this.chatSessionService.getSession(realSessionId);
             
             // Update webview with new messages
             webviewPanel.webview.postMessage({
@@ -148,6 +200,17 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
                 loading: false
             });
 
+            // If session ID changed (new session was created), refresh dashboard
+            if (sessionId !== realSessionId && sessionId.startsWith('session-')) {
+                // Add a small delay to ensure backend has committed the session
+                setTimeout(() => {
+                    vscode.commands.executeCommand('quill.refreshChatSessions');
+                }, 500);
+            }
+
+            // Return the real session ID so caller can update
+            return realSessionId;
+
         } catch (error: any) {
             webviewPanel.webview.postMessage({
                 command: 'messageLoading',
@@ -158,6 +221,9 @@ export class ChatEditorProvider implements vscode.CustomTextEditorProvider {
                 command: 'showError',
                 error: error.message
             });
+
+            // Return the original session ID on error
+            return sessionId;
         }
     }
 

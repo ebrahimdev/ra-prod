@@ -5,6 +5,7 @@ import { AuthService } from '../services/authService';
 import { RagProvider } from './ragProvider';
 import { SearchResultsEditorProvider } from './searchResultsEditorProvider';
 import { ChatEditorProvider } from './chatEditorProvider';
+import { ChatSessionService } from '../services/chatSessionService';
 
 export class DashboardProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'quill.dashboard';
@@ -13,6 +14,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     private documentService: DocumentService;
     private authService: AuthService;
     private ragProvider: RagProvider;
+    private chatSessionService: ChatSessionService;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -21,6 +23,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         this.documentService = new DocumentService(context);
         this.authService = new AuthService(context);
         this.ragProvider = new RagProvider(context);
+        this.chatSessionService = new ChatSessionService(context);
     }
 
     public resolveWebviewView(
@@ -73,6 +76,15 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     case 'searchDocuments':
                         this.handleSearchDocuments(message.query);
                         return;
+                    case 'getChatSessions':
+                        this.getChatSessions();
+                        return;
+                    case 'openChatSession':
+                        this.handleOpenChatSession(message.sessionId);
+                        return;
+                    case 'deleteChatSession':
+                        this.handleDeleteChatSession(message.sessionId);
+                        return;
                 }
             },
             undefined,
@@ -88,6 +100,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
             this.getAuthStatus();
             this.getDocuments();
             this.getWorkspacePdfs();
+            this.getChatSessions();
         }
     }
 
@@ -349,6 +362,59 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    private async getChatSessions() {
+        try {
+            const sessions = await this.chatSessionService.getRecentSessions();
+            this._view?.webview.postMessage({
+                command: 'chatSessionsLoaded',
+                sessions: sessions
+            });
+        } catch (error: any) {
+            this._view?.webview.postMessage({
+                command: 'error',
+                message: `Failed to load chat sessions: ${error.message}`
+            });
+        }
+    }
+
+    /**
+     * Public method to refresh chat sessions (called by command)
+     */
+    public refreshChatSessions() {
+        this.getChatSessions();
+    }
+
+    private async handleOpenChatSession(sessionId: string) {
+        try {
+            // Open the existing chat session
+            await ChatEditorProvider.openChatSession(this.context, undefined, sessionId);
+            
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to open chat session: ${error.message}`);
+        }
+    }
+
+    private async handleDeleteChatSession(sessionId: string) {
+        try {
+            const confirm = await vscode.window.showWarningMessage(
+                'Are you sure you want to delete this chat session?',
+                { modal: true },
+                'Delete'
+            );
+
+            if (confirm === 'Delete') {
+                await this.chatSessionService.deleteSession(sessionId);
+                
+                // Refresh chat sessions
+                this.getChatSessions();
+                
+                vscode.window.showInformationMessage('Chat session deleted successfully');
+            }
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to delete chat session: ${error.message}`);
+        }
+    }
+
     private _getHtmlForWebview(webview: vscode.Webview) {
         // Use a nonce to only allow specific scripts to be run
         const nonce = getNonce();
@@ -485,7 +551,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
                 .query-input {
                     width: 100%;
-                    padding: 12px 40px 12px 16px;
+                    padding: 12px 44px 12px 16px;
                     border: 1px solid var(--vscode-input-border);
                     background-color: var(--vscode-input-background);
                     color: var(--vscode-input-foreground);
@@ -515,38 +581,14 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     color: var(--vscode-foreground);
                 }
 
-                .query-results {
-                    max-height: 200px;
-                    overflow-y: auto;
-                    border: 1px solid var(--vscode-panel-border);
-                    border-radius: 4px;
-                    padding: 10px;
-                    background-color: var(--vscode-panel-background);
-                    margin-top: 10px;
-                    display: none;
-                }
-
-                .query-result {
-                    margin-bottom: 15px;
-                    padding-bottom: 10px;
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                }
-
-                .query-result:last-child {
-                    border-bottom: none;
-                    margin-bottom: 0;
-                }
-
-                .result-document {
-                    font-weight: bold;
-                    color: var(--vscode-textLink-foreground);
-                    margin-bottom: 5px;
-                }
-
-                .result-content {
-                    font-size: 12px;
-                    line-height: 1.4;
-                    color: var(--vscode-descriptionForeground);
+                .search-spinner {
+                    position: absolute;
+                    right: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
 
                 .documents-grid {
@@ -669,17 +711,118 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     opacity: 1;
                 }
 
-                .results-section {
+                .chat-history-section {
                     margin-bottom: 30px;
                 }
 
-                .results-title {
-                    font-size: 14px;
-                    font-weight: bold;
-                    margin-bottom: 15px;
-                    color: var(--vscode-settings-headerForeground);
-                    border-bottom: 1px solid var(--vscode-panel-border);
-                    padding-bottom: 5px;
+                .chat-history-container {
+                    display: grid;
+                    gap: 2px;
+                    max-height: 148px; /* 5 items × 28px height + 4 gaps × 2px = 148px */
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                    position: relative;
+                }
+
+                .chat-history-container::-webkit-scrollbar {
+                    width: 0;
+                    background: transparent;
+                }
+
+                .chat-session-card.fade-bottom {
+                    position: relative;
+                }
+
+                .chat-session-card.fade-bottom::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    height: 100%;
+                    background: linear-gradient(transparent 60%, var(--vscode-editor-background));
+                    pointer-events: none;
+                    z-index: 1;
+                }
+
+                .chat-session-card {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 3px 4px;
+                    border-radius: 2px;
+                    background-color: transparent;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                    border: 1px solid transparent;
+                    position: relative;
+                    min-height: 28px;
+                }
+
+                .chat-session-card:hover {
+                    background-color: var(--vscode-list-hoverBackground);
+                    border-color: var(--vscode-panel-border);
+                }
+
+                .chat-session-icon {
+                    width: 12px;
+                    height: 12px;
+                    flex-shrink: 0;
+                    font-size: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--vscode-textLink-foreground);
+                }
+
+                .chat-session-content {
+                    flex: 1;
+                    min-width: 0;
+                }
+
+                .chat-session-title {
+                    font-size: 11px;
+                    color: var(--vscode-editor-foreground);
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    line-height: 1.1;
+                    z-index: 2;
+                    position: relative;
+                }
+
+                .chat-session-time {
+                    font-size: 10px;
+                    color: var(--vscode-descriptionForeground);
+                    opacity: 0.8;
+                }
+
+                .chat-session-actions {
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                    display: flex;
+                    gap: 4px;
+                }
+
+                .chat-session-card:hover .chat-session-actions {
+                    opacity: 1;
+                }
+
+                .chat-delete-btn {
+                    background: none;
+                    border: none;
+                    color: var(--vscode-descriptionForeground);
+                    cursor: pointer;
+                    padding: 1px 2px;
+                    border-radius: 2px;
+                    font-size: 10px;
+                    flex-shrink: 0;
+                    margin-left: -6px;
+                }
+
+                .chat-delete-btn:hover {
+                    background-color: var(--vscode-inputValidation-errorBackground);
+                    color: var(--vscode-inputValidation-errorForeground);
                 }
 
                 .library-section {
@@ -776,11 +919,19 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 <div class="search-container">
                     <input type="text" class="query-input" id="queryInput" placeholder="Search your research papers...">
                     <span class="search-icon" id="searchIcon">🔍</span>
+                    <div class="search-spinner" id="searchSpinner" style="display: none;">
+                        <div class="spinner"></div>
+                    </div>
                 </div>
 
-                <div class="results-section" id="resultsSection" style="display: none;">
-                    <div class="results-title">Results</div>
-                    <div id="resultsContainer"></div>
+                <div class="chat-history-section" id="chatHistorySection">
+                    <div class="section-title">💬 Chat History</div>
+                    <div id="chatHistoryContainer">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading chat history...
+                        </div>
+                    </div>
                 </div>
 
                 <div class="library-section" id="librarySection">
@@ -823,6 +974,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 let workspacePdfs = state.workspacePdfs;
                 let allPapers = state.allPapers;
                 let uploadingFiles = new Map(state.uploadingFiles || []); // Convert back to Map
+                let chatSessions = [];
                 
                 
                 // Save state function
@@ -883,11 +1035,15 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                             break;
                         case 'searchResults':
                             console.log('[Webview] Received searchResults message:', message);
-                            handleSearchResults(message.results, message.query);
+                            // Hide the search spinner since search is complete
+                            hideSearchLoading();
                             break;
                         case 'searchError':
                             console.log('[Webview] Received searchError message:', message);
                             handleSearchError(message.message);
+                            break;
+                        case 'chatSessionsLoaded':
+                            updateChatSessions(message.sessions);
                             break;
                         case 'error':
                             showError(message.message);
@@ -943,6 +1099,147 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     workspacePdfs = pdfs;
                     saveState();
                     updateAllPapers();
+                }
+
+                function updateChatSessions(sessions) {
+                    chatSessions = sessions;
+                    renderChatSessions();
+                }
+
+                function updateFadeEffect() {
+                    const container = document.getElementById('chatHistoryContainer');
+                    if (!container) return;
+                    
+                    const chatContainer = container.querySelector('.chat-history-container');
+                    const sessionCards = container.querySelectorAll('.chat-session-card');
+                    
+                    if (!chatContainer || sessionCards.length === 0) return;
+                    
+                    // Remove fade from all cards
+                    sessionCards.forEach(card => card.classList.remove('fade-bottom'));
+                    
+                    // Get container dimensions
+                    const containerRect = chatContainer.getBoundingClientRect();
+                    const containerBottom = containerRect.bottom;
+                    
+                    // Find the last visible card
+                    let lastVisibleCard = null;
+                    for (let i = sessionCards.length - 1; i >= 0; i--) {
+                        const cardRect = sessionCards[i].getBoundingClientRect();
+                        const cardBottom = cardRect.bottom;
+                        
+                        // Check if card is visible and within container bounds
+                        if (cardRect.top < containerBottom && cardBottom > containerRect.top) {
+                            // This is a visible card, check if it's at the bottom edge
+                            if (cardBottom > containerBottom - 5) { // 5px tolerance
+                                lastVisibleCard = sessionCards[i];
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Apply fade to the last visible card if there are more items below
+                    if (lastVisibleCard && chatContainer.scrollTop + chatContainer.clientHeight < chatContainer.scrollHeight - 5) {
+                        lastVisibleCard.classList.add('fade-bottom');
+                    }
+                }
+
+                function renderChatSessions() {
+                    const container = document.getElementById('chatHistoryContainer');
+                    
+                    if (!container) {
+                        console.error('[Webview] chatHistoryContainer not found');
+                        return;
+                    }
+                    
+                    if (chatSessions.length === 0) {
+                        container.innerHTML = '<div class="empty-state">No chat history yet.<br>Start a conversation by searching!</div>';
+                        return;
+                    }
+
+                    const sessionsHtml = chatSessions.map(session => {
+                        const timeAgo = getTimeAgo(session.lastActivity);
+                        
+                        return \`
+                            <div class="chat-session-card" data-session-id="\${session.id}">
+                                <div class="chat-session-icon">💬</div>
+                                <div class="chat-session-content">
+                                    <div class="chat-session-title">\${session.title}</div>
+                                    <div class="chat-session-time">\${timeAgo}</div>
+                                </div>
+                                <div class="chat-session-actions">
+                                    <button class="chat-delete-btn" data-session-id="\${session.id}" title="Delete chat">×</button>
+                                </div>
+                            </div>
+                        \`;
+                    }).join('');
+                    
+                    container.innerHTML = '<div class="chat-history-container">' + sessionsHtml + '</div>';
+                    
+                    // Apply fade effect to bottom visible item if there are more than 5 sessions
+                    if (chatSessions.length > 5) {
+                        updateFadeEffect();
+                        
+                        // Add scroll listener to update fade effect
+                        const chatContainer = container.querySelector('.chat-history-container');
+                        if (chatContainer) {
+                            chatContainer.addEventListener('scroll', updateFadeEffect);
+                        }
+                    }
+                    
+                    // Attach event listeners
+                    const sessionCards = container.querySelectorAll('.chat-session-card');
+                    sessionCards.forEach(card => {
+                        card.addEventListener('click', (e) => {
+                            // Don't trigger if clicking on delete button
+                            if (e.target.closest('.chat-delete-btn')) {
+                                return;
+                            }
+                            const sessionId = card.getAttribute('data-session-id');
+                            openChatSession(sessionId);
+                        });
+                    });
+                    
+                    const deleteButtons = container.querySelectorAll('.chat-delete-btn');
+                    deleteButtons.forEach(button => {
+                        button.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const sessionId = button.getAttribute('data-session-id');
+                            deleteChatSession(sessionId);
+                        });
+                    });
+                }
+
+                function getTimeAgo(date) {
+                    const now = new Date();
+                    const inputDate = new Date(date);
+                    
+                    // Debug logging
+                    console.log('[Dashboard] getTimeAgo - now:', now.toISOString(), 'inputDate:', inputDate.toISOString());
+                    
+                    const diffMs = now.getTime() - inputDate.getTime();
+                    const diffMins = Math.floor(diffMs / (1000 * 60));
+                    const diffHours = Math.floor(diffMins / 60);
+                    const diffDays = Math.floor(diffHours / 24);
+                    
+                    console.log('[Dashboard] getTimeAgo - diffMs:', diffMs, 'diffMins:', diffMins);
+                    
+                    if (diffMins < 1) return 'Just now';
+                    if (diffMins === 1) return '1 minute ago';
+                    if (diffMins < 60) return \`\${diffMins} minutes ago\`;
+                    if (diffHours === 1) return '1 hour ago';
+                    if (diffHours < 24) return \`\${diffHours} hours ago\`;
+                    if (diffDays === 1) return 'Yesterday';
+                    if (diffDays < 7) return \`\${diffDays} days ago\`;
+                    return inputDate.toLocaleDateString();
+                }
+
+                function openChatSession(sessionId) {
+                    vscode.postMessage({ command: 'openChatSession', sessionId: sessionId });
+                }
+
+                function deleteChatSession(sessionId) {
+                    vscode.postMessage({ command: 'deleteChatSession', sessionId: sessionId });
                 }
 
                 function updateAllPapers() {
@@ -1234,65 +1531,25 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 }
 
                 function showSearchLoading() {
-                    const resultsSection = document.getElementById('resultsSection');
-                    const resultsContainer = document.getElementById('resultsContainer');
+                    const searchSpinner = document.getElementById('searchSpinner');
+                    const searchIcon = document.getElementById('searchIcon');
                     
-                    resultsSection.style.display = 'block';
-                    resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Searching documents...</div>';
-                }
-
-                function hideQueryProgress() {
-                    // Results will be replaced by actual results or hidden
-                }
-
-                function showSearchResults(matchedDocuments, query, searchResults) {
-                    const resultsSection = document.getElementById('resultsSection');
-                    const librarySection = document.getElementById('librarySection');
-                    
-                    if (!matchedDocuments || matchedDocuments.length === 0) {
-                        resultsSection.style.display = 'none';
-                        // Show all documents in library as lowlighted
-                        renderDocuments(documents, 'library', []);
-                        return;
+                    if (searchSpinner && searchIcon) {
+                        searchIcon.style.display = 'none';
+                        searchSpinner.style.display = 'flex';
                     }
+                }
 
-                    // Sort matched documents by relevance from search results
-                    if (searchResults && searchResults.length > 0) {
-                        // Create relevance map from search results
-                        const relevanceMap = new Map();
-                        searchResults.forEach(result => {
-                            const docId = result.document_id;
-                            if (!relevanceMap.has(docId) || relevanceMap.get(docId) < result.similarity) {
-                                relevanceMap.set(docId, result.similarity);
-                            }
-                        });
-                        
-                        // Sort by relevance score
-                        matchedDocuments.sort((a, b) => {
-                            const aScore = relevanceMap.get(a.id) || 0;
-                            const bScore = relevanceMap.get(b.id) || 0;
-                            return bScore - aScore;
-                        });
+                function hideSearchLoading() {
+                    const searchSpinner = document.getElementById('searchSpinner');
+                    const searchIcon = document.getElementById('searchIcon');
+                    
+                    if (searchSpinner && searchIcon) {
+                        searchSpinner.style.display = 'none';
+                        searchIcon.style.display = 'block';
                     }
-
-                    // Show results section with top 3 matches
-                    const topMatches = matchedDocuments.slice(0, 3);
-                    resultsSection.style.display = 'block';
-                    renderDocuments(topMatches, 'results');
-                    
-                    // Show remaining library documents as lowlighted
-                    const highlightedIds = topMatches.map(doc => doc.id);
-                    const remainingDocs = documents.filter(doc => !highlightedIds.includes(doc.id));
-                    renderDocuments(remainingDocs, 'library', highlightedIds);
                 }
 
-                function clearSearchResults() {
-                    const resultsSection = document.getElementById('resultsSection');
-                    resultsSection.style.display = 'none';
-                    
-                    // Show all documents normally in library
-                    renderDocuments(documents, 'library', []);
-                }
 
                 function showError(message) {
                     // Find a good place to show the error, or create a toast
@@ -1304,6 +1561,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     if (isAuthenticated) {
                         vscode.postMessage({ command: 'getDocuments' });
                         vscode.postMessage({ command: 'getWorkspacePdfs' });
+                        vscode.postMessage({ command: 'getChatSessions' });
                     }
                     // Note: updateAllPapers() will be called when the data comes back
                     // through updateDocuments() and updateWorkspacePdfs() which will
@@ -1335,8 +1593,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                     console.log('[Webview] performSearch called with query:', query);
                     
                     if (!query) {
-                        console.log('[Webview] Empty query, clearing results');
-                        clearSearchResults();
+                        console.log('[Webview] Empty query');
                         return;
                     }
 
@@ -1355,46 +1612,9 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
                 let currentSearchQuery = '';
 
-                function handleSearchResults(searchResults, query) {
-                    console.log('[Webview] handleSearchResults called with:', { searchResults, query, currentSearchQuery });
-                    
-                    // Ensure this is for the current search
-                    if (query !== currentSearchQuery) {
-                        console.log('[Webview] Query mismatch, ignoring results');
-                        return;
-                    }
-
-                    try {
-                        console.log('[Webview] Processing search results...');
-                        console.log('[Webview] Current documents array:', documents);
-                        
-                        // Get unique document IDs from search results
-                        const matchedDocIds = new Set(searchResults.map(result => result.document_id));
-                        console.log('[Webview] Matched document IDs:', Array.from(matchedDocIds));
-                        
-                        // Filter documents to show matched ones
-                        const matchedDocs = documents.filter(doc => matchedDocIds.has(doc.id));
-                        console.log('[Webview] Matched documents:', matchedDocs);
-                        
-                        showSearchResults(matchedDocs, query, searchResults);
-                        console.log('[Webview] showSearchResults completed');
-                    } catch (error) {
-                        console.error('[Webview] Search results processing failed:', error);
-                        handleSearchError('Failed to process search results');
-                    }
-                }
-
                 function handleSearchError(errorMessage) {
                     console.error('Search failed:', errorMessage);
-                    
-                    // Fallback to client-side search
-                    const query = currentSearchQuery;
-                    const matchedDocs = documents.filter(doc => 
-                        doc.title.toLowerCase().includes(query.toLowerCase()) ||
-                        (doc.metadata && JSON.stringify(doc.metadata).toLowerCase().includes(query.toLowerCase()))
-                    );
-                    
-                    showSearchResults(matchedDocs, query);
+                    hideSearchLoading();
                 }
 
                 // Initialize event listeners
@@ -1419,12 +1639,11 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                             }
                         });
                         
-                        // Real-time search as user types (with debounce)
-                        let searchTimeout;
+                        // Clear search spinner when input is empty
                         queryInput.addEventListener('input', (event) => {
                             const query = event.target.value.trim();
                             if (query.length === 0) {
-                                clearSearchResults();
+                                hideSearchLoading();
                             }
                         });
                     }

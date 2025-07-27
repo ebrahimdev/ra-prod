@@ -2,10 +2,10 @@ import uuid
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, desc
 from ..middleware.auth_middleware import require_auth
 from ..core.document_service import DocumentService
-from ..models.document import Base
+from ..models.document import Base, ChatSession, ChatMessage, MessageRole
 from ..utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -40,19 +40,50 @@ def send_message():
         
         user_message = data['message']
         session_id = data.get('session_id')
-        chat_history = data.get('chat_history', [])
-        
-        # Generate session ID if not provided
-        if not session_id:
-            session_id = str(uuid.uuid4())
         
         logger.info(f"Processing chat message for user {user_id}, session {session_id}")
         
         db = get_db()
         try:
-            document_service = DocumentService(db)
+            # Get or create session
+            if session_id:
+                session = db.query(ChatSession).filter_by(id=session_id, user_id=user_id).first()
+                if not session:
+                    return jsonify({"error": "Chat session not found"}), 404
+            else:
+                # Create new session
+                session_id = str(uuid.uuid4())
+                session_title = user_message[:50] + "..." if len(user_message) > 50 else user_message
+                session = ChatSession(
+                    id=session_id,
+                    user_id=user_id,
+                    title=session_title
+                )
+                db.add(session)
+                db.flush()  # Get the session ID
+            
+            # Get chat history from database
+            messages = db.query(ChatMessage).filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+            chat_history = []
+            for msg in messages:
+                chat_history.append({
+                    "role": msg.role.value,
+                    "content": msg.content
+                })
+            
+            # Save user message to database
+            user_msg_id = str(uuid.uuid4())
+            user_db_message = ChatMessage(
+                id=user_msg_id,
+                session_id=session_id,
+                role=MessageRole.USER,
+                content=user_message,
+                timestamp=datetime.utcnow()
+            )
+            db.add(user_db_message)
             
             # Generate chat response with document context
+            document_service = DocumentService(db)
             chat_response = document_service.generate_chat_response(
                 user_id=user_id,
                 user_message=user_message,
@@ -60,11 +91,31 @@ def send_message():
                 session_id=session_id
             )
             
+            # Save assistant message to database
+            assistant_msg_id = str(uuid.uuid4())
+            assistant_timestamp = datetime.utcnow()
+            assistant_db_message = ChatMessage(
+                id=assistant_msg_id,
+                session_id=session_id,
+                role=MessageRole.ASSISTANT,
+                content=chat_response,
+                timestamp=assistant_timestamp
+            )
+            db.add(assistant_db_message)
+            
+            # Update session last activity
+            session.last_activity = assistant_timestamp
+            
+            # Commit all changes
+            db.commit()
+            
             response_data = {
                 "session_id": session_id,
                 "message": chat_response,
-                "timestamp": datetime.utcnow().isoformat(),
-                "user_message": user_message
+                "timestamp": assistant_timestamp.isoformat(),
+                "user_message": user_message,
+                "user_message_id": user_msg_id,
+                "assistant_message_id": assistant_msg_id
             }
             
             return jsonify(response_data)
@@ -78,24 +129,104 @@ def send_message():
         logger.error(f"Chat error traceback: {traceback.format_exc()}")
         return jsonify({"error": "Failed to process chat message"}), 500
 
-@chat_bp.route('/sessions/<session_id>', methods=['GET'])
+@chat_bp.route('/sessions', methods=['GET'])
 @require_auth
-def get_session(session_id):
-    """Get chat session history (if we implement session storage later)."""
+def get_sessions():
+    """Get all chat sessions for the user."""
     try:
         user_id = request.current_user['id']
         
-        # For now, return empty session - this can be extended later
-        # with actual session storage in database
+        db = get_db()
+        try:
+            # Get sessions ordered by last activity (most recent first)
+            sessions = db.query(ChatSession).filter_by(user_id=user_id).order_by(desc(ChatSession.last_activity)).all()
+            
+            sessions_data = []
+            for session in sessions:
+                sessions_data.append({
+                    "id": session.id,
+                    "title": session.title,
+                    "created_at": session.created_at.isoformat(),
+                    "last_activity": session.last_activity.isoformat()
+                })
+            
+            return jsonify({"sessions": sessions_data})
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Error retrieving chat sessions: {str(e)}")
+        return jsonify({"error": "Failed to retrieve chat sessions"}), 500
+
+@chat_bp.route('/sessions/<session_id>', methods=['GET'])
+@require_auth
+def get_session(session_id):
+    """Get specific chat session with full message history."""
+    try:
+        user_id = request.current_user['id']
         
-        response_data = {
-            "session_id": session_id,
-            "messages": [],
-            "created_at": datetime.utcnow().isoformat()
-        }
-        
-        return jsonify(response_data)
+        db = get_db()
+        try:
+            # Get session and ensure it belongs to the user
+            session = db.query(ChatSession).filter_by(id=session_id, user_id=user_id).first()
+            
+            if not session:
+                return jsonify({"error": "Chat session not found"}), 404
+            
+            # Get messages for the session
+            messages = db.query(ChatMessage).filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+            
+            messages_data = []
+            for message in messages:
+                messages_data.append({
+                    "id": message.id,
+                    "role": message.role.value,
+                    "content": message.content,
+                    "timestamp": message.timestamp.isoformat()
+                })
+            
+            response_data = {
+                "id": session.id,
+                "title": session.title,
+                "created_at": session.created_at.isoformat(),
+                "last_activity": session.last_activity.isoformat(),
+                "messages": messages_data
+            }
+            
+            return jsonify(response_data)
+            
+        finally:
+            db.close()
         
     except Exception as e:
         logger.error(f"Error retrieving chat session: {str(e)}")
         return jsonify({"error": "Failed to retrieve chat session"}), 500
+
+@chat_bp.route('/sessions/<session_id>', methods=['DELETE'])
+@require_auth
+def delete_session(session_id):
+    """Delete a chat session."""
+    try:
+        user_id = request.current_user['id']
+        
+        db = get_db()
+        try:
+            # Get session and ensure it belongs to the user
+            session = db.query(ChatSession).filter_by(id=session_id, user_id=user_id).first()
+            
+            if not session:
+                return jsonify({"error": "Chat session not found"}), 404
+            
+            # Delete the session (messages will be deleted automatically due to cascade)
+            db.delete(session)
+            db.commit()
+            
+            return jsonify({"message": "Chat session deleted successfully"})
+            
+        finally:
+            db.close()
+        
+    except Exception as e:
+        logger.error(f"Error deleting chat session: {str(e)}")
+        return jsonify({"error": "Failed to delete chat session"}), 500
