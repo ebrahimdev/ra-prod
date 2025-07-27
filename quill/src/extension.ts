@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CommandManager } from './commands/commandManager';
 import { DashboardProvider } from './providers/dashboardProvider';
 import { SearchResultsEditorProvider } from './providers/searchResultsEditorProvider';
+import { ChatEditorProvider } from './providers/chatEditorProvider';
 import { StatusBarProvider } from './providers/statusBarProvider';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -12,6 +13,12 @@ export function activate(context: vscode.ExtensionContext) {
     const searchResultsEditorProvider = new SearchResultsEditorProvider(context);
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(SearchResultsEditorProvider.viewType, searchResultsEditorProvider)
+    );
+
+    // Register the chat editor provider
+    const chatEditorProvider = new ChatEditorProvider(context);
+    context.subscriptions.push(
+        vscode.window.registerCustomEditorProvider(ChatEditorProvider.viewType, chatEditorProvider)
     );
 
     // Register the dashboard webview provider

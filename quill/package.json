@@ -2,7 +2,7 @@
   "name": "quill",
   "displayName": "Quill RAG Extension",
   "description": "VSCode extension for RAG functionality",
-  "version": "0.0.37",
+  "version": "0.0.38",
   "engines": {
     "vscode": "^1.74.0"
   },

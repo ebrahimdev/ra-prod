@@ -233,6 +233,97 @@ Please provide a comprehensive answer to their query based on this information f
             logger.error(f"Error generating LLM response: {str(e)}")
             return f"Based on your search for '{query}', I found {len(search_results)} relevant excerpts from your papers, but couldn't generate a detailed response. Please check the search results below for relevant information."
     
+    def generate_chat_response(self, user_id: int, user_message: str, chat_history: List[Dict[str, Any]], session_id: str) -> str:
+        """Generate a chat response with document context and conversation history."""
+        try:
+            # First, search for relevant documents based on the user's message
+            search_response = self.search_documents(user_id, user_message, top_k=5)
+            relevant_chunks = search_response.get('results', [])
+            
+            # Build context from relevant documents
+            document_context = ""
+            if relevant_chunks:
+                context_chunks = []
+                for i, result in enumerate(relevant_chunks[:3]):  # Use top 3 for context
+                    chunk_content = result['content'][:300]  # Shorter chunks for chat
+                    document_title = result['document_title']
+                    page_num = result.get('page_number', 'N/A')
+                    
+                    reference = f"[{document_title}"
+                    if page_num != 'N/A':
+                        reference += f", p.{page_num}"
+                    reference += "]"
+                    
+                    context_chunks.append(f"{reference}: {chunk_content}")
+                
+                document_context = "\n\n".join(context_chunks)
+            
+            # Build conversation history for context
+            conversation_context = ""
+            if chat_history:
+                recent_history = chat_history[-4:]  # Last 4 messages for context
+                history_parts = []
+                for msg in recent_history:
+                    role = msg.get('role', 'unknown')
+                    content = msg.get('content', '')
+                    if role == 'user':
+                        history_parts.append(f"User: {content}")
+                    elif role == 'assistant':
+                        history_parts.append(f"Assistant: {content}")
+                
+                if history_parts:
+                    conversation_context = "\n".join(history_parts)
+            
+            # Create chat prompt
+            messages = [
+                {
+                    "role": "system",
+                    "content": """You are a research assistant helping a user with their academic paper library. You can:
+                    1. Answer questions about their research papers
+                    2. Help with brainstorming and research ideas
+                    3. Provide insights based on their document collection
+                    4. Continue conversations with context from previous messages
+                    
+                    Always be helpful, concise, and reference specific papers when relevant.
+                    Format your response in Markdown for better readability.
+                    Use inline citations like [Paper Title, p.X] when referencing specific content."""
+                }
+            ]
+            
+            # Add conversation history if available
+            if conversation_context:
+                messages.append({
+                    "role": "system",
+                    "content": f"Previous conversation context:\n{conversation_context}"
+                })
+            
+            # Add document context if available
+            user_content = f"User message: {user_message}"
+            if document_context:
+                user_content += f"\n\nRelevant excerpts from their papers:\n{document_context}"
+            else:
+                user_content += "\n\nNo specific documents found relevant to this message."
+            
+            messages.append({
+                "role": "user",
+                "content": user_content
+            })
+            
+            # Call LLM
+            response = self.llm_client.chat_completion(
+                messages=messages,
+                max_tokens=600,
+                temperature=0.3  # Slightly higher for more conversational responses
+            )
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"Error generating chat response: {str(e)}")
+            import traceback
+            logger.error(f"Chat error traceback: {traceback.format_exc()}")
+            return "I apologize, but I'm having trouble generating a response right now. Please try again."
+    
     def get_document_chunks(self, user_id: int, document_id: int) -> List[DocumentChunk]:
         """Get all chunks for a specific document."""
         document = self.get_document(user_id, document_id)

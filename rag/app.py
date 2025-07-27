@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from src.api.routes import api_bp
 from src.api.document_routes import doc_bp
+from src.api.chat_routes import chat_bp
 from src.utils.logger import setup_logger
 from config.settings import Settings
 
@@ -15,6 +16,7 @@ def create_app():
     
     app.register_blueprint(api_bp)
     app.register_blueprint(doc_bp)
+    app.register_blueprint(chat_bp)
     
     logger = setup_logger(__name__)
     

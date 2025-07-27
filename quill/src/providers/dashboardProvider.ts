@@ -4,6 +4,7 @@ import { DocumentService, Document } from '../services/documentService';
 import { AuthService } from '../services/authService';
 import { RagProvider } from './ragProvider';
 import { SearchResultsEditorProvider } from './searchResultsEditorProvider';
+import { ChatEditorProvider } from './chatEditorProvider';
 
 export class DashboardProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'quill.dashboard';
@@ -335,8 +336,8 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 count: searchResponse.results.length
             });
             
-            // Open LLM response in editor tab instead of raw results
-            await SearchResultsEditorProvider.openSearchResults(query, searchResponse.llm_response);
+            // Open chat session with the search query as initial message
+            await ChatEditorProvider.openChatSession(this.context, query);
             
             console.log(`[Dashboard] Sent searchResults message to webview and opened LLM response editor`);
         } catch (error: any) {
