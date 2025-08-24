@@ -30,10 +30,23 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     cd /opt/ra-prod/rag/new
     
     echo "🐍 Setting up Python virtual environment"
+    # Remove any existing broken venv
+    rm -rf venv
     python3 -m venv venv
     source venv/bin/activate
+    
+    # Upgrade pip with retry logic
     pip install --upgrade pip
-    pip install -r requirements.txt
+    
+    echo "📦 Installing Python dependencies (this may take several minutes)..."
+    # Install with more robust options
+    pip install --no-cache-dir --force-reinstall -r requirements.txt
+    
+    # Verify critical packages are installed
+    echo "🔍 Verifying installations..."
+    python -c "import flask; print('✅ Flask installed')" || echo "❌ Flask not installed"
+    python -c "import flask_cors; print('✅ Flask-CORS installed')" || echo "❌ Flask-CORS not installed"
+    python -c "import torch; print('✅ PyTorch installed')" || echo "❌ PyTorch not installed"
     
     # Create uploads directory
     mkdir -p uploads
