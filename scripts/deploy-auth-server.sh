@@ -46,12 +46,6 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     pip install --upgrade pip
     pip install -r requirements.txt
     
-    # Create instance directory for database with proper permissions
-    mkdir -p instance
-    chmod 755 instance
-    touch instance/auth.db
-    chmod 664 instance/auth.db
-    
     # Copy production environment configuration
     if [ -f "/opt/ra-prod/config/auth-server.prod.env" ]; then
         cp /opt/ra-prod/config/auth-server.prod.env .env
@@ -60,19 +54,30 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         echo "⚠️  Warning: No production configuration found. Using defaults."
     fi
     
-    # Initialize database if it doesn't exist
-    if [ ! -s "instance/auth.db" ]; then
-        echo "🗃️ Initializing database"
-        source venv/bin/activate
-        python -c "
+    # Create instance directory for database with proper permissions
+    mkdir -p instance
+    chmod 755 instance
+    
+    # Ensure database file exists and has proper permissions
+    if [ ! -f "instance/auth.db" ]; then
+        echo "🗃️ Creating database file"
+        touch instance/auth.db
+    fi
+    chmod 664 instance/auth.db
+    
+    # Initialize database tables
+    echo "🗃️ Initializing database tables"
+    source venv/bin/activate
+    python -c "
+import os
+os.environ['DATABASE_URL'] = 'sqlite:///instance/auth.db'
 from app import create_app
 app = create_app()
 with app.app_context():
     from src.models.database import db
     db.create_all()
-    print('Database initialized successfully')
-"
-    fi
+    print('✅ Database initialized successfully')
+" || echo "⚠️ Database initialization failed, but continuing..."
     
     echo "🔄 Activating new deployment"
     if [ -d "/opt/ra-prod/auth-server/current" ]; then
