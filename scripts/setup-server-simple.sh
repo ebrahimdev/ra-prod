@@ -131,6 +131,7 @@ Environment=FLASK_ENV=production
 Environment=FLASK_APP=app.py
 Environment=HOST=127.0.0.1
 Environment=PORT=5000
+Environment=DATABASE_URL=sqlite:///instance/auth.db
 ExecStart=/opt/ra-prod/auth-server/current/venv/bin/python app.py
 Restart=always
 RestartSec=10

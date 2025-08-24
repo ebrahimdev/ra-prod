@@ -46,8 +46,11 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     pip install --upgrade pip
     pip install -r requirements.txt
     
-    # Create instance directory for database
+    # Create instance directory for database with proper permissions
     mkdir -p instance
+    chmod 755 instance
+    touch instance/auth.db
+    chmod 664 instance/auth.db
     
     # Copy production environment configuration
     if [ -f "/opt/ra-prod/config/auth-server.prod.env" ]; then
@@ -55,6 +58,20 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         echo "📄 Using existing production configuration"
     else
         echo "⚠️  Warning: No production configuration found. Using defaults."
+    fi
+    
+    # Initialize database if it doesn't exist
+    if [ ! -s "instance/auth.db" ]; then
+        echo "🗃️ Initializing database"
+        source venv/bin/activate
+        python -c "
+from app import create_app
+app = create_app()
+with app.app_context():
+    from src.models.database import db
+    db.create_all()
+    print('Database initialized successfully')
+"
     fi
     
     echo "🔄 Activating new deployment"

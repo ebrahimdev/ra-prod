@@ -22,6 +22,10 @@ def create_app():
     migrate.init_app(app, db)
     jwt = JWTManager(app)
     
+    @app.route('/health', methods=['GET'])
+    def health():
+        return {"status": "healthy", "service": "auth-server"}
+    
     app.register_blueprint(auth_bp)
     
     with app.app_context():
