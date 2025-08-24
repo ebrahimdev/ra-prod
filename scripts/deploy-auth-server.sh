@@ -69,8 +69,6 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     echo "🗃️ Initializing database tables"
     source venv/bin/activate
     python -c "
-import os
-os.environ['DATABASE_URL'] = 'sqlite:///instance/auth.db'
 from app import create_app
 app = create_app()
 with app.app_context():
@@ -78,6 +76,23 @@ with app.app_context():
     db.create_all()
     print('✅ Database initialized successfully')
 " || echo "⚠️ Database initialization failed, but continuing..."
+    
+    # Verify database was created and has content
+    if [ -f "instance/auth.db" ] && [ -s "instance/auth.db" ]; then
+        echo "✅ Database file created successfully"
+        ls -la instance/auth.db
+        echo "📊 Database tables created:"
+        source venv/bin/activate
+        python -c "
+from app import create_app
+app = create_app()
+with app.app_context():
+    from src.models.database import db
+    print('Tables:', db.engine.table_names())
+" 2>/dev/null || echo "Could not list tables"
+    else
+        echo "⚠️ Database file seems empty or missing, will try to create during runtime"
+    fi
     
     echo "🔄 Activating new deployment"
     if [ -d "/opt/ra-prod/auth-server/current" ]; then

@@ -48,6 +48,7 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     
     # Create uploads directory
     mkdir -p uploads
+    chmod 755 uploads
     
     # Copy production environment configuration
     if [ -f "/opt/ra-prod/config/rag-server.prod.env" ]; then
@@ -55,6 +56,22 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         echo "📄 Using existing production configuration"
     else
         echo "⚠️  Warning: No production configuration found. Using defaults."
+    fi
+    
+    # Ensure documents database file exists and has proper permissions
+    if [ ! -f "documents.db" ]; then
+        echo "🗃️ Creating documents database file"
+        touch documents.db
+    fi
+    chmod 664 documents.db
+    
+    # Test database permissions
+    if [ -w "documents.db" ]; then
+        echo "✅ Documents database is writable"
+        ls -la documents.db
+    else
+        echo "⚠️ Documents database may have permission issues"
+        ls -la documents.db
     fi
     
     # Copy database if it exists from current deployment
