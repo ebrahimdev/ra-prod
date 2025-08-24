@@ -29,15 +29,45 @@ def create_app():
     app.register_blueprint(auth_bp)
     
     with app.app_context():
-        # Ensure database directory exists
-        import os
-        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-        db_dir = os.path.dirname(db_path)
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
-        
-        # Create database tables
-        db.create_all()
+        try:
+            # Ensure database directory exists
+            import os
+            db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+            print(f"Database URI: {db_uri}")
+            
+            db_path = db_uri.replace('sqlite:///', '')
+            print(f"Database path: {db_path}")
+            
+            # Get absolute path
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(os.getcwd(), db_path)
+            print(f"Absolute database path: {db_path}")
+            
+            db_dir = os.path.dirname(db_path)
+            print(f"Database directory: {db_dir}")
+            print(f"Current working directory: {os.getcwd()}")
+            
+            if db_dir and not os.path.exists(db_dir):
+                print(f"Creating directory: {db_dir}")
+                os.makedirs(db_dir, exist_ok=True)
+            
+            # Create database tables
+            print("Creating database tables...")
+            db.create_all()
+            print("✅ Database initialization successful")
+            
+        except Exception as e:
+            print(f"❌ Database initialization failed: {e}")
+            print(f"Working directory: {os.getcwd()}")
+            print(f"Directory contents: {os.listdir('.')}")
+            if os.path.exists('instance'):
+                print(f"Instance directory contents: {os.listdir('instance')}")
+            
+            # Try to continue without database initialization
+            # The database will be created on first actual use
+            print("⚠️ Continuing without database initialization - database will be created on first use")
+            import traceback
+            traceback.print_exc()
     
     logger = setup_logger(__name__)
     
