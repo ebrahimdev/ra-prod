@@ -116,18 +116,35 @@ SERVICE_EOF
     fi
 EOF
 
-# Restart the service
-echo "🔄 Restarting service"
+# Update and restart the systemd service with the new configuration
 ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
-    sudo systemctl restart auth-server
-    sleep 5
+    # Reload systemd configuration
+    sudo systemctl daemon-reload
+    
+    # Stop service if running
+    sudo systemctl stop auth-server 2>/dev/null || true
+    
+    # Start service
+    echo "🔄 Starting auth-server service"
+    sudo systemctl start auth-server
+    
+    # Wait and check status
+    sleep 10
     
     if sudo systemctl is-active --quiet auth-server; then
-        echo "✅ Auth Server deployed successfully"
+        echo "✅ Auth Server started successfully"
         sudo systemctl status auth-server --no-pager -l
+        
+        # Test health endpoint
+        echo "🔍 Testing health endpoint..."
+        sleep 5
+        curl -f http://localhost:5000/health || echo "⚠️ Health endpoint not responding yet"
     else
         echo "❌ Auth Server failed to start"
-        sudo journalctl -u auth-server --no-pager -l -n 20
+        echo "📊 Service status:"
+        sudo systemctl status auth-server --no-pager -l
+        echo "📋 Recent logs:"
+        sudo journalctl -u auth-server --no-pager -l -n 30
         exit 1
     fi
 EOF

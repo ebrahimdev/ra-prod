@@ -106,18 +106,35 @@ SERVICE_EOF
     fi
 EOF
 
-# Restart the service
-echo "🔄 Restarting service"
+# Update and restart the systemd service
 ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
-    sudo systemctl restart rag-server
-    sleep 5
+    # Reload systemd configuration
+    sudo systemctl daemon-reload
+    
+    # Stop service if running
+    sudo systemctl stop rag-server 2>/dev/null || true
+    
+    # Start service
+    echo "🔄 Starting rag-server service"
+    sudo systemctl start rag-server
+    
+    # Wait and check status
+    sleep 10
     
     if sudo systemctl is-active --quiet rag-server; then
-        echo "✅ RAG Server deployed successfully"
+        echo "✅ RAG Server started successfully"
         sudo systemctl status rag-server --no-pager -l
+        
+        # Test health endpoint
+        echo "🔍 Testing health endpoint..."
+        sleep 5
+        curl -f http://localhost:5001/health || echo "⚠️ Health endpoint not responding yet"
     else
         echo "❌ RAG Server failed to start"
-        sudo journalctl -u rag-server --no-pager -l -n 20
+        echo "📊 Service status:"
+        sudo systemctl status rag-server --no-pager -l
+        echo "📋 Recent logs:"
+        sudo journalctl -u rag-server --no-pager -l -n 30
         exit 1
     fi
 EOF

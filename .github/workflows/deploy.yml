@@ -15,20 +15,21 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: 'quill/package-lock.json'
     
     - name: Build Production Quill Extension
       run: |
         cd quill
-        npm install
+        npm ci --prefer-offline
         npm run compile
-        # Build VSIX with npx to avoid Node.js compatibility issues
-        npx --yes @vscode/vsce@latest package
-        # Increment version and rename
+        # Increment version first
         CURRENT_VERSION=$(node -p "require('./package.json').version")
         IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
         PATCH_VERSION=$((${VERSION_PARTS[2]} + 1))
         NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH_VERSION"
         npm version $NEW_VERSION --no-git-tag-version
+        # Build VSIX with npx (cached)
         npx --yes @vscode/vsce@latest package
     
     - name: Upload Quill Artifact
@@ -77,10 +78,34 @@ jobs:
     
     - name: Health Check
       run: |
-        sleep 10
-        curl -f http://45.76.61.43:5000/health || exit 1
-        curl -f http://45.76.61.43:5001/health || exit 1
-        echo "Health checks passed!"
+        echo "⏳ Waiting for services to fully start..."
+        sleep 15
+        
+        echo "🔍 Testing Auth Server health..."
+        for i in {1..5}; do
+          if curl -f http://45.76.61.43:5000/health; then
+            echo "✅ Auth Server health check passed"
+            break
+          else
+            echo "⚠️ Auth Server health check failed (attempt $i/5)"
+            if [ $i -eq 5 ]; then exit 1; fi
+            sleep 5
+          fi
+        done
+        
+        echo "🔍 Testing RAG Server health..."
+        for i in {1..5}; do
+          if curl -f http://45.76.61.43:5001/health; then
+            echo "✅ RAG Server health check passed"
+            break
+          else
+            echo "⚠️ RAG Server health check failed (attempt $i/5)"
+            if [ $i -eq 5 ]; then exit 1; fi
+            sleep 5
+          fi
+        done
+        
+        echo "🎉 All health checks passed!"
 
   release:
     runs-on: ubuntu-latest
