@@ -37,15 +37,22 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
     
     - name: Build Production Quill Extension
       run: |
         cd quill
         npm install
         npm run compile
-        # Create production build with server endpoint
-        PROD_SERVER=45.76.61.43 npm run build
+        # Build VSIX with npx to avoid Node.js compatibility issues
+        npx --yes @vscode/vsce@latest package
+        # Increment version and rename
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+        PATCH_VERSION=$((${VERSION_PARTS[2]} + 1))
+        NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH_VERSION"
+        npm version $NEW_VERSION --no-git-tag-version
+        npx --yes @vscode/vsce@latest package
     
     - name: Upload Quill Artifact
       uses: actions/upload-artifact@v4

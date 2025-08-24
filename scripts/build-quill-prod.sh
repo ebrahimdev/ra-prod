@@ -44,13 +44,8 @@ npm run compile
 
 # Build VSIX package
 echo "📦 Building VSIX package"
-if command -v vsce &> /dev/null; then
-    vsce package
-else
-    echo "Installing vsce..."
-    npm install -g @vscode/vsce
-    vsce package
-fi
+# Use npx to avoid Node.js compatibility issues with global vsce
+npx --yes @vscode/vsce@latest package
 
 # Clean up production config file
 rm -f src/utils/prodConfig.ts
