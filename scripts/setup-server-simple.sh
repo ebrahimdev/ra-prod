@@ -2,56 +2,54 @@
 
 set -e
 
-echo "🚀 Setting up Production Server for ra-prod deployment"
-echo "🔧 This script will install required dependencies and configure the server"
+echo "🚀 Simple Server Setup for ra-prod deployment (Debian 12)"
 
 # Update system packages
 echo "📦 Updating system packages"
 apt-get update && apt-get upgrade -y
 
-# Install Python 3.11 and pip (Debian 12 has Python 3.11 by default)
-echo "🐍 Installing Python and dependencies"
-apt-get install -y python3 python3-venv python3-dev python3-pip
+# Install essential packages
+echo "🐍 Installing Python and essential packages"
+apt-get install -y python3 python3-venv python3-dev python3-pip curl wget git rsync htop tree nginx
 
 # Verify Python version
+echo "Python version:"
 python3 --version
 
-# Install Node.js 18 (for future use)
+# Install Node.js 18 (for future use if needed)
 echo "📦 Installing Node.js 18"
 curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
 apt-get install -y nodejs
 
-# Install nginx
-echo "🌐 Installing nginx"
-apt-get install -y nginx
-
-# Install other utilities
-echo "🔧 Installing utilities"
-apt-get install -y curl wget git rsync htop tree
+echo "Node.js version:"
+node --version
 
 # Create deployment directory
 echo "📁 Creating deployment directories"
-mkdir -p /opt/ra-prod/{auth-server,rag,backups}
+mkdir -p /opt/ra-prod/{auth-server,rag,backups,config}
 chown -R root:root /opt/ra-prod
 
-# Configure nginx
-echo "⚙️ Configuring nginx"
+# Configure firewall (basic)
+echo "🔥 Configuring basic firewall"
+apt-get install -y ufw
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 5000/tcp
+ufw allow 5001/tcp
+ufw --force enable
+
+# Start and enable nginx
+echo "🌐 Starting nginx"
+systemctl start nginx
+systemctl enable nginx
+
+# Create basic nginx config for our apps
+echo "⚙️ Creating basic nginx configuration"
 cat > /etc/nginx/sites-available/ra-prod << 'EOF'
-# Auth Server (Port 5000)
 server {
     listen 80;
     server_name _;
     
-    # Health check endpoint
-    location /health {
-        proxy_pass http://127.0.0.1:5000/health;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    
-    # Auth API endpoints
     location /api/auth/ {
         proxy_pass http://127.0.0.1:5000/;
         proxy_set_header Host $host;
@@ -60,19 +58,15 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
     
-    # RAG API endpoints
     location /api/rag/ {
         proxy_pass http://127.0.0.1:5001/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Handle file uploads
         client_max_body_size 50M;
     }
     
-    # Default to auth server for backward compatibility
     location / {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
@@ -82,7 +76,6 @@ server {
     }
 }
 
-# Direct access to Auth Server
 server {
     listen 5000;
     server_name _;
@@ -96,7 +89,6 @@ server {
     }
 }
 
-# Direct access to RAG Server
 server {
     listen 5001;
     server_name _;
@@ -107,8 +99,6 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Handle file uploads for RAG server
         client_max_body_size 50M;
     }
 }
@@ -121,13 +111,8 @@ rm -f /etc/nginx/sites-enabled/default
 # Test nginx configuration
 nginx -t
 
-# Configure firewall
-echo "🔥 Configuring firewall"
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 5000/tcp
-ufw allow 5001/tcp
-ufw --force enable
+# Reload nginx
+systemctl reload nginx
 
 # Create systemd service files
 echo "⚙️ Creating systemd service files"
@@ -144,9 +129,9 @@ User=root
 WorkingDirectory=/opt/ra-prod/auth-server/current
 Environment=FLASK_ENV=production
 Environment=FLASK_APP=app.py
-Environment=FLASK_RUN_HOST=127.0.0.1
-Environment=FLASK_RUN_PORT=5000
-ExecStart=/opt/ra-prod/auth-server/current/venv/bin/python -m flask run
+Environment=HOST=127.0.0.1
+Environment=PORT=5000
+ExecStart=/opt/ra-prod/auth-server/current/venv/bin/python app.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -168,9 +153,9 @@ User=root
 WorkingDirectory=/opt/ra-prod/rag/current
 Environment=FLASK_ENV=production
 Environment=FLASK_APP=app.py
-Environment=FLASK_RUN_HOST=127.0.0.1
-Environment=FLASK_RUN_PORT=5001
-ExecStart=/opt/ra-prod/rag/current/venv/bin/python -m flask run
+Environment=HOST=127.0.0.1
+Environment=PORT=5001
+ExecStart=/opt/ra-prod/rag/current/venv/bin/python app.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -186,13 +171,8 @@ systemctl daemon-reload
 # Enable services (but don't start them yet - they'll be started by deployment)
 systemctl enable auth-server
 systemctl enable rag-server
-systemctl enable nginx
 
-# Start nginx
-systemctl start nginx
-systemctl status nginx --no-pager -l
-
-# Create a simple monitoring script
+# Create monitoring script
 echo "📊 Creating monitoring script"
 cat > /opt/ra-prod/monitor.sh << 'EOF'
 #!/bin/bash
@@ -208,8 +188,8 @@ systemctl is-active --quiet nginx && echo "✅ Nginx: Running" || echo "❌ Ngin
 
 echo ""
 echo "🌐 Health Checks:"
-curl -s -f http://localhost:5000/health >/dev/null && echo "✅ Auth Server Health: OK" || echo "❌ Auth Server Health: FAIL"
-curl -s -f http://localhost:5001/health >/dev/null && echo "✅ RAG Server Health: OK" || echo "❌ RAG Server Health: FAIL"
+curl -s -f http://localhost:5000/health >/dev/null 2>&1 && echo "✅ Auth Server Health: OK" || echo "❌ Auth Server Health: FAIL"
+curl -s -f http://localhost:5001/health >/dev/null 2>&1 && echo "✅ RAG Server Health: OK" || echo "❌ RAG Server Health: FAIL"
 
 echo ""
 echo "💾 Disk Usage:"
@@ -218,46 +198,21 @@ df -h /opt/ra-prod
 echo ""
 echo "🧠 Memory Usage:"
 free -h
-
-echo ""
-echo "📊 Process Info:"
-ps aux | grep -E "(python|flask)" | grep -v grep
 EOF
 
 chmod +x /opt/ra-prod/monitor.sh
 
-# Create log rotation
-echo "📝 Setting up log rotation"
-cat > /etc/logrotate.d/ra-prod << 'EOF'
-/var/log/auth-server.log
-/var/log/rag-server.log {
-    daily
-    missingok
-    rotate 52
-    compress
-    delaycompress
-    notifempty
-    create 644 root root
-}
-EOF
-
-# Final summary
 echo ""
-echo "🎉 Server setup completed successfully!"
+echo "🎉 Simple server setup completed successfully!"
 echo ""
-echo "📋 Summary:"
-echo "  - Python 3.11 installed"
-echo "  - Node.js 18 installed"  
-echo "  - Nginx configured and running"
-echo "  - Systemd services created (auth-server, rag-server)"
-echo "  - Firewall configured (ports 22, 80, 5000, 5001)"
-echo "  - Deployment directory created: /opt/ra-prod"
+echo "📋 What was installed:"
+echo "  - Python 3 with venv support"
+echo "  - Node.js 18"
+echo "  - Nginx with ra-prod configuration"
+echo "  - UFW firewall (ports 22, 80, 5000, 5001)"
+echo "  - Systemd services for auth-server and rag-server"
+echo "  - Deployment directories: /opt/ra-prod"
 echo "  - Monitoring script: /opt/ra-prod/monitor.sh"
 echo ""
-echo "🔧 Next steps:"
-echo "  1. Run your deployment scripts to deploy the applications"
-echo "  2. Check status with: /opt/ra-prod/monitor.sh"
-echo "  3. View logs with: journalctl -u auth-server -f"
-echo "                    journalctl -u rag-server -f"
-echo ""
 echo "✅ Server is ready for deployment!"
+echo "Now you can run your GitHub Actions workflow or manual deployment scripts."
