@@ -29,6 +29,14 @@ def create_app():
     app.register_blueprint(auth_bp)
     
     with app.app_context():
+        # Ensure database directory exists
+        import os
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        
+        # Create database tables
         db.create_all()
     
     logger = setup_logger(__name__)
