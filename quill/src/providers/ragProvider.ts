@@ -1,14 +1,12 @@
 import axios from 'axios';
 import * as vscode from 'vscode';
-import { ConfigManager } from '../utils/configManager';
+import { configManager } from '../utils/configManager';
 import { AuthService } from '../services/authService';
 
 export class RagProvider {
-    private configManager: ConfigManager;
     private authService: AuthService;
 
     constructor(context: vscode.ExtensionContext) {
-        this.configManager = new ConfigManager();
         this.authService = new AuthService(context);
     }
 
@@ -19,7 +17,8 @@ export class RagProvider {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.post(`${baseUrl}/api/query`, {

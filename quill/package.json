@@ -87,7 +87,9 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "build": "node build.js"
+    "build": "node build.js",
+    "build:prod": "QUILL_PRODUCTION=true npm run compile && npm run package",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "16.x",

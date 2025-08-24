@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
+import { configManager } from '../utils/configManager';
 
 export interface User {
     id: number;
@@ -14,16 +15,19 @@ export interface AuthTokens {
 }
 
 export class AuthService {
-    private readonly authServerUrl: string;
     private readonly context: vscode.ExtensionContext;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
-        this.authServerUrl = 'http://localhost:8001';
+    }
+
+    private getAuthServerUrl(): string {
+        const prodConfig = configManager.getProductionConfig();
+        return prodConfig ? prodConfig.authServerUrl : configManager.getAuthServerUrl();
     }
 
     async login(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }> {
-        const response = await axios.post(`${this.authServerUrl}/api/auth/login`, {
+        const response = await axios.post(`${this.getAuthServerUrl()}/api/auth/login`, {
             email,
             password
         });
@@ -37,7 +41,7 @@ export class AuthService {
     }
 
     async register(email: string, password: string, firstName: string, lastName: string): Promise<{ user: User; tokens: AuthTokens }> {
-        const response = await axios.post(`${this.authServerUrl}/api/auth/register`, {
+        const response = await axios.post(`${this.getAuthServerUrl()}/api/auth/register`, {
             email,
             password,
             first_name: firstName,
@@ -76,7 +80,7 @@ export class AuthService {
         if (!tokens) return null;
 
         try {
-            const response = await axios.post(`${this.authServerUrl}/api/auth/refresh`, {}, {
+            const response = await axios.post(`${this.getAuthServerUrl()}/api/auth/refresh`, {}, {
                 headers: {
                     'Authorization': `Bearer ${tokens.refresh_token}`
                 }

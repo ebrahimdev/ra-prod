@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import { AuthService } from './authService';
-import { ConfigManager } from '../utils/configManager';
+import { configManager } from '../utils/configManager';
 
 export interface ChatMessage {
     id: string;
@@ -34,13 +34,11 @@ export interface SendMessageResult {
 
 export class ChatSessionService {
     private authService: AuthService;
-    private configManager: ConfigManager;
     private context: vscode.ExtensionContext;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         this.authService = new AuthService(context);
-        this.configManager = new ConfigManager();
     }
 
     /**
@@ -71,7 +69,8 @@ export class ChatSessionService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.get(`${baseUrl}/api/chat/sessions`, {
@@ -118,7 +117,8 @@ export class ChatSessionService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.get(`${baseUrl}/api/chat/sessions/${sessionId}`, {
@@ -189,7 +189,8 @@ export class ChatSessionService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.post(`${baseUrl}/api/chat/message`, {
@@ -244,7 +245,8 @@ export class ChatSessionService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             await axios.delete(`${baseUrl}/api/chat/sessions/${sessionId}`, {

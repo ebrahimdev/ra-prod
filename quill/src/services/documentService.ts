@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as FormData from 'form-data';
 import { AuthService } from './authService';
-import { ConfigManager } from '../utils/configManager';
+import { configManager } from '../utils/configManager';
 
 export interface Document {
     id: number;
@@ -41,11 +41,9 @@ export interface SearchResponse {
 
 export class DocumentService {
     private authService: AuthService;
-    private configManager: ConfigManager;
 
     constructor(context: vscode.ExtensionContext) {
         this.authService = new AuthService(context);
-        this.configManager = new ConfigManager();
     }
 
     async uploadDocument(filePath: string): Promise<Document> {
@@ -71,7 +69,8 @@ export class DocumentService {
             throw new Error('Only PDF files are allowed');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             // Create form data
@@ -123,7 +122,8 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.get(`${baseUrl}/api/documents/`, {
@@ -160,7 +160,8 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         const deleteUrl = `${baseUrl}/api/documents/${documentId}`;
         
         
@@ -199,7 +200,8 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.delete(`${baseUrl}/api/documents/clear-all`, {
@@ -237,7 +239,8 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const baseUrl = this.configManager.getRagServerUrl();
+        const prodConfig = configManager.getProductionConfig();
+        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
         
         try {
             const response = await axios.post(`${baseUrl}/api/documents/search`, {
