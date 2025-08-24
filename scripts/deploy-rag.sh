@@ -13,18 +13,7 @@ echo "🚀 Deploying RAG Server to $SERVER_HOST"
 # Create deployment directory structure on server
 ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     sudo mkdir -p /opt/ra-prod/rag
-    sudo mkdir -p /opt/ra-prod/backups
     sudo chown -R $USER:$USER /opt/ra-prod
-EOF
-
-# Backup current deployment if it exists
-ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
-    if [ -d "/opt/ra-prod/rag/current" ]; then
-        echo "📦 Creating backup of current deployment"
-        sudo cp -r /opt/ra-prod/rag/current /opt/ra-prod/backups/rag-$(date +%Y%m%d-%H%M%S)
-        # Keep only last 5 backups
-        sudo find /opt/ra-prod/backups -name "rag-*" -type d | sort -r | tail -n +6 | xargs sudo rm -rf
-    fi
 EOF
 
 # Upload application files

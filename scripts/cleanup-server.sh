@@ -78,13 +78,10 @@ rm -rf /root/.cache/* 2>/dev/null
 echo "🐍 Cleaning old venv directories..."
 find /opt -name "venv" -type d -path "*/backup*" -exec rm -rf {} \; 2>/dev/null
 
-# 11. Clean deployment backups (keep last 3)
-echo "🗃️ Cleaning old deployment backups..."
-if [ -d "/opt/ra-prod/backups" ]; then
-    cd /opt/ra-prod/backups
-    ls -t | tail -n +4 | xargs -r rm -rf
-    echo "Kept last 3 backups, removed older ones"
-fi
+# 11. Remove all deployment backups (no longer needed)
+echo "🗃️ Removing all deployment backups..."
+rm -rf /opt/ra-prod/backups
+find /opt/ra-prod -name "*backup*" -type d -exec rm -rf {} \; 2>/dev/null || true
 
 # 12. Clean old coredumps
 echo "💥 Cleaning coredumps..."
