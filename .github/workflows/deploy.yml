@@ -48,7 +48,7 @@ jobs:
         PROD_SERVER=45.76.61.43 npm run build
     
     - name: Upload Quill Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: quill-production
         path: quill/quill-*.vsix
@@ -106,22 +106,23 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Download Quill Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: quill-production
         path: ./artifacts
     
     - name: Create Release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ github.run_number }}
-        release_name: Release v${{ github.run_number }}
+        name: Release v${{ github.run_number }}
         body: |
           Production deployment completed successfully
           - Auth Server deployed to 45.76.61.43:5000
           - RAG Server deployed to 45.76.61.43:5001
           - Quill extension built for production
+        files: ./artifacts/quill-*.vsix
         draft: false
         prerelease: false
