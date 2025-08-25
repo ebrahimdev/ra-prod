@@ -79,6 +79,13 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         rm -rf /opt/ra-prod/auth-server/current
     fi
     mv /opt/ra-prod/auth-server/new /opt/ra-prod/auth-server/current
+    
+    echo "🔧 Recreating virtual environment with correct paths"
+    cd /opt/ra-prod/auth-server/current
+    rm -rf venv
+    python3.10 -m venv venv
+    ./venv/bin/pip install --upgrade pip
+    ./venv/bin/pip install --no-cache-dir -r requirements.txt
 EOF
 
 # Install/update systemd service if it doesn't exist
