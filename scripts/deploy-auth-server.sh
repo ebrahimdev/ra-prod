@@ -29,10 +29,10 @@ rsync -avz --delete \
 ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     cd /opt/ra-prod/auth-server/new
     
-    echo "🐍 Setting up Python virtual environment"
+    echo "🐍 Setting up Python 3.10 virtual environment"
     # Remove any existing broken venv
     rm -rf venv
-    python3 -m venv venv
+    python3.10 -m venv venv
     source venv/bin/activate
     
     # Upgrade pip

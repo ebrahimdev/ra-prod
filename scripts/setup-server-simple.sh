@@ -8,13 +8,16 @@ echo "🚀 Simple Server Setup for ra-prod deployment (Debian 12)"
 echo "📦 Updating system packages"
 apt-get update && apt-get upgrade -y
 
-# Install essential packages
-echo "🐍 Installing Python and essential packages"
-apt-get install -y python3 python3-venv python3-dev python3-pip curl wget git rsync htop tree nginx
+# Install essential packages including Python 3.10
+echo "🐍 Installing Python 3.10 and essential packages"
+apt-get install -y software-properties-common
+add-apt-repository ppa:deadsnakes/ppa -y
+apt-get update
+apt-get install -y python3.10 python3.10-venv python3.10-dev python3-pip curl wget git rsync htop tree nginx
 
 # Verify Python version
-echo "Python version:"
-python3 --version
+echo "Python 3.10 version:"
+python3.10 --version
 
 # Install Node.js 18 (for future use if needed)
 echo "📦 Installing Node.js 18"

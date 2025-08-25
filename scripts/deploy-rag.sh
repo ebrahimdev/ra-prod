@@ -25,14 +25,20 @@ rsync -avz --delete \
     --exclude='uploads/' \
     ./rag/ $SERVER_USER@$SERVER_HOST:/opt/ra-prod/rag/new/
 
+# Stop the service first to prevent restart conflicts
+ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
+    sudo systemctl stop rag-server 2>/dev/null || true
+    sudo systemctl disable rag-server 2>/dev/null || true
+EOF
+
 # Set up virtual environment and install dependencies
 ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     cd /opt/ra-prod/rag/new
     
-    echo "🐍 Setting up Python virtual environment"
+    echo "🐍 Setting up Python 3.10 virtual environment"
     # Remove any existing broken venv
     rm -rf venv
-    python3 -m venv venv
+    python3.10 -m venv venv
     source venv/bin/activate
     
     # Upgrade pip with retry logic
