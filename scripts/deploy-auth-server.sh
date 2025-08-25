@@ -29,24 +29,36 @@ rsync -avz --delete \
 ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     cd /opt/ra-prod/auth-server/new
     
-    echo "🐍 Setting up Python 3.10 virtual environment"
+    echo "🐍 Setting up Python virtual environment"
     # Remove any existing broken venv
     rm -rf venv
-    python3.10 -m venv venv
+    
+    # Try Python 3.10 first, fall back to 3.11, then 3
+    if command -v python3.10 &> /dev/null; then
+        echo "Using Python 3.10"
+        python3.10 -m venv venv
+    elif command -v python3.11 &> /dev/null; then
+        echo "Using Python 3.11"
+        python3.11 -m venv venv
+    else
+        echo "Using default Python 3"
+        python3 -m venv venv
+    fi
+    
     source venv/bin/activate
     
-    # Upgrade pip
+    # Upgrade pip within venv
     pip install --upgrade pip
     
     echo "📦 Installing Python dependencies..."
-    # Install with more robust options
+    # Install within venv (no system package conflicts)
     pip install --no-cache-dir --force-reinstall -r requirements.txt
     
-    # Verify critical packages are installed
+    # Verify critical packages are installed using the venv python
     echo "🔍 Verifying installations..."
-    python -c "import flask; print('✅ Flask installed')" || echo "❌ Flask not installed"
-    python -c "import flask_cors; print('✅ Flask-CORS installed')" || echo "❌ Flask-CORS not installed"
-    python -c "import sqlalchemy; print('✅ SQLAlchemy installed')" || echo "❌ SQLAlchemy not installed"
+    ./venv/bin/python -c "import flask; print('✅ Flask installed')" || echo "❌ Flask not installed"
+    ./venv/bin/python -c "import flask_cors; print('✅ Flask-CORS installed')" || echo "❌ Flask-CORS not installed"
+    ./venv/bin/python -c "import sqlalchemy; print('✅ SQLAlchemy installed')" || echo "❌ SQLAlchemy not installed"
     
     # Copy production environment configuration
     if [ -f "/opt/ra-prod/config/auth-server.prod.env" ]; then
