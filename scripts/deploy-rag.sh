@@ -39,16 +39,14 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     # Remove any existing broken venv
     rm -rf venv
     
-    # Try Python 3.10 first, fall back to 3.11, then 3
+    # Force Python 3.10 usage - fail if not available
     if command -v python3.10 &> /dev/null; then
         echo "Using Python 3.10"
         python3.10 -m venv venv
-    elif command -v python3.11 &> /dev/null; then
-        echo "Using Python 3.11"
-        python3.11 -m venv venv
     else
-        echo "Using default Python 3"
-        python3 -m venv venv
+        echo "❌ ERROR: Python 3.10 is required but not found!"
+        echo "Please install Python 3.10 on the server first."
+        exit 1
     fi
     
     # Always use the venv pip directly to avoid confusion
@@ -56,7 +54,7 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     ./venv/bin/pip install --upgrade pip
     
     echo "📦 Installing Python dependencies (this may take several minutes)..."
-    echo "Using pip: $(which ./venv/bin/pip)"
+    echo "Using pip: $(pwd)/venv/bin/pip"
     ./venv/bin/pip install --no-cache-dir --force-reinstall -r requirements.txt
     
     # Verify critical packages are installed using venv python
