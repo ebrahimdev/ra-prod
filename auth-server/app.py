@@ -49,7 +49,17 @@ def create_app():
             
             if db_dir and not os.path.exists(db_dir):
                 print(f"Creating directory: {db_dir}")
-                os.makedirs(db_dir, exist_ok=True)
+                os.makedirs(db_dir, mode=0o755, exist_ok=True)
+            
+            # Ensure the database file can be created
+            if not os.path.exists(db_path):
+                print(f"Creating database file: {db_path}")
+                with open(db_path, 'a'):
+                    pass
+                os.chmod(db_path, 0o664)
+            
+            print(f"Database file permissions: {oct(os.stat(db_path).st_mode)}")
+            print(f"Database file size: {os.path.getsize(db_path)} bytes")
             
             # Create database tables
             print("Creating database tables...")
