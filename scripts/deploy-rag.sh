@@ -51,20 +51,23 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         python3 -m venv venv
     fi
     
-    source venv/bin/activate
-    
-    # Upgrade pip within venv
-    pip install --upgrade pip
+    # Always use the venv pip directly to avoid confusion
+    echo "🔧 Using venv pip directly"
+    ./venv/bin/pip install --upgrade pip
     
     echo "📦 Installing Python dependencies (this may take several minutes)..."
-    # Install within venv (no system package conflicts)
-    pip install --no-cache-dir --force-reinstall -r requirements.txt
+    echo "Using pip: $(which ./venv/bin/pip)"
+    ./venv/bin/pip install --no-cache-dir --force-reinstall -r requirements.txt
     
     # Verify critical packages are installed using venv python
     echo "🔍 Verifying installations..."
     ./venv/bin/python -c "import flask; print('✅ Flask installed')" || echo "❌ Flask not installed"
     ./venv/bin/python -c "import flask_cors; print('✅ Flask-CORS installed')" || echo "❌ Flask-CORS not installed"
     ./venv/bin/python -c "import torch; print('✅ PyTorch installed')" || echo "❌ PyTorch not installed"
+    
+    # Show what packages are actually installed
+    echo "📋 Installed packages:"
+    ./venv/bin/pip list | head -20
     
     # Create uploads directory
     mkdir -p uploads

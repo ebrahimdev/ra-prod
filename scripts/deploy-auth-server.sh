@@ -45,20 +45,23 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         python3 -m venv venv
     fi
     
-    source venv/bin/activate
-    
-    # Upgrade pip within venv
-    pip install --upgrade pip
+    # Always use the venv pip directly to avoid confusion
+    echo "🔧 Using venv pip directly"
+    ./venv/bin/pip install --upgrade pip
     
     echo "📦 Installing Python dependencies..."
-    # Install within venv (no system package conflicts)
-    pip install --no-cache-dir --force-reinstall -r requirements.txt
+    echo "Using pip: $(which ./venv/bin/pip)"
+    ./venv/bin/pip install --no-cache-dir --force-reinstall -r requirements.txt
     
     # Verify critical packages are installed using the venv python
     echo "🔍 Verifying installations..."
     ./venv/bin/python -c "import flask; print('✅ Flask installed')" || echo "❌ Flask not installed"
     ./venv/bin/python -c "import flask_cors; print('✅ Flask-CORS installed')" || echo "❌ Flask-CORS not installed"
     ./venv/bin/python -c "import sqlalchemy; print('✅ SQLAlchemy installed')" || echo "❌ SQLAlchemy not installed"
+    
+    # Show what packages are actually installed
+    echo "📋 Installed packages:"
+    ./venv/bin/pip list | head -10
     
     # Copy production environment configuration
     if [ -f "/opt/ra-prod/config/auth-server.prod.env" ]; then
