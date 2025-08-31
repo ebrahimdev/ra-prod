@@ -17,8 +17,7 @@ export class RagProvider {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const prodConfig = configManager.getProductionConfig();
-        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
+        const baseUrl = configManager.getRagServerUrl();
         
         try {
             const response = await axios.post(`${baseUrl}/api/query`, {

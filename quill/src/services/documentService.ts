@@ -69,8 +69,7 @@ export class DocumentService {
             throw new Error('Only PDF files are allowed');
         }
 
-        const prodConfig = configManager.getProductionConfig();
-        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
+        const baseUrl = configManager.getRagServerUrl();
         
         try {
             // Create form data
@@ -122,8 +121,7 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const prodConfig = configManager.getProductionConfig();
-        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
+        const baseUrl = configManager.getRagServerUrl();
         
         try {
             const response = await axios.get(`${baseUrl}/api/documents/`, {
@@ -160,8 +158,7 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const prodConfig = configManager.getProductionConfig();
-        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
+        const baseUrl = configManager.getRagServerUrl();
         const deleteUrl = `${baseUrl}/api/documents/${documentId}`;
         
         
@@ -200,8 +197,7 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const prodConfig = configManager.getProductionConfig();
-        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
+        const baseUrl = configManager.getRagServerUrl();
         
         try {
             const response = await axios.delete(`${baseUrl}/api/documents/clear-all`, {
@@ -239,8 +235,7 @@ export class DocumentService {
             throw new Error('Not authenticated. Please login first.');
         }
 
-        const prodConfig = configManager.getProductionConfig();
-        const baseUrl = prodConfig ? prodConfig.ragServerUrl : configManager.getRagServerUrl();
+        const baseUrl = configManager.getRagServerUrl();
         
         try {
             const response = await axios.post(`${baseUrl}/api/documents/search`, {

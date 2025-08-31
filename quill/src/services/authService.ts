@@ -23,8 +23,7 @@ export class AuthService {
     }
 
     private getAuthServerUrl(): string {
-        const prodConfig = configManager.getProductionConfig();
-        const url = prodConfig ? prodConfig.authServerUrl : configManager.getAuthServerUrl();
+        const url = configManager.getAuthServerUrl();
         Logger.info(`Using auth server URL: ${url}`);
         Logger.info(`Is production build: ${configManager.isProductionBuild()}`);
         return url;

@@ -88,7 +88,7 @@
     "compile": "node scripts/generate-build-config.js && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "build": "node build.js",
-    "build:prod": "QUILL_PRODUCTION=true node scripts/generate-build-config.js && QUILL_PRODUCTION=true tsc -p ./ && vsce package",
+    "build:prod": "QUILL_PRODUCTION=true node scripts/generate-build-config.js && QUILL_PRODUCTION=true tsc -p ./ && npx @vscode/vsce package",
     "package": "vsce package"
   },
   "devDependencies": {
