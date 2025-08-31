@@ -1,3 +1,6 @@
+# Use CPU-only PyTorch to avoid massive CUDA downloads
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 flask==2.3.3
 flask-cors==4.0.0
 python-dotenv==1.0.0
@@ -9,12 +12,12 @@ requests==2.31.0
 PyMuPDF==1.23.14
 pdfplumber==0.10.3
 
-# NLP and Embeddings
-sentence-transformers
-transformers
-torch
-numpy
-huggingface-hub
+# NLP and Embeddings (CPU-only versions)
+torch==2.3.0+cpu
+sentence-transformers==2.4.0
+transformers==4.35.2
+numpy==1.24.3
+huggingface-hub==0.16.4
 
 # Database
 sqlalchemy==2.0.23

@@ -113,12 +113,43 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     fi
     mv /opt/ra-prod/rag/new /opt/ra-prod/rag/current
     
-    echo "🔧 Recreating virtual environment with correct paths"
+    echo "🔧 Setting up optimized virtual environment"
     cd /opt/ra-prod/rag/current
-    rm -rf venv
-    python3.10 -m venv venv
-    ./venv/bin/pip install --upgrade pip
-    ./venv/bin/pip install --no-cache-dir -r requirements.txt
+    
+    # Check if we can reuse existing venv
+    REQUIREMENTS_HASH=$(sha256sum requirements.txt | cut -d' ' -f1)
+    VENV_HASH_FILE="/opt/ra-prod/rag/.requirements_hash"
+    
+    if [ -f "$VENV_HASH_FILE" ] && [ -d "venv" ] && [ "$(cat $VENV_HASH_FILE)" = "$REQUIREMENTS_HASH" ]; then
+        echo "📦 Requirements unchanged, preserving existing virtual environment"
+        # Just verify critical packages are still working
+        if ./venv/bin/python -c "import torch, sentence_transformers; print('✅ ML packages OK')" 2>/dev/null; then
+            echo "✅ Virtual environment is healthy, skipping reinstall"
+        else
+            echo "⚠️ Virtual environment corrupted, rebuilding..."
+            rm -rf venv
+        fi
+    else
+        echo "📦 Requirements changed or no existing venv, creating fresh environment"
+        rm -rf venv
+    fi
+    
+    # Create venv only if it doesn't exist
+    if [ ! -d "venv" ]; then
+        echo "🐍 Creating Python 3.10 virtual environment..."
+        python3.10 -m venv venv
+        ./venv/bin/pip install --upgrade pip
+        
+        # Use persistent pip cache and CPU-only packages for massive space savings
+        echo "📦 Installing packages (CPU-only, with persistent cache)..."
+        export PIP_CACHE_DIR="/opt/ra-prod/.pip-cache"
+        mkdir -p "$PIP_CACHE_DIR"
+        ./venv/bin/pip install --cache-dir="$PIP_CACHE_DIR" -r requirements.txt
+        
+        # Store requirements hash for next deployment
+        echo "$REQUIREMENTS_HASH" > "$VENV_HASH_FILE"
+        echo "✅ Virtual environment created and cached"
+    fi
 EOF
 
 # Install/update systemd service if it doesn't exist
