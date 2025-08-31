@@ -2,7 +2,7 @@
   "name": "quill",
   "displayName": "Quill RAG Extension",
   "description": "VSCode extension for RAG functionality",
-  "version": "0.0.60",
+  "version": "0.0.61",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -85,10 +85,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "node scripts/generate-build-config.js && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "build": "node build.js",
-    "build:prod": "QUILL_PRODUCTION=true npm run compile && npm run package",
+    "build:prod": "QUILL_PRODUCTION=true node scripts/generate-build-config.js && QUILL_PRODUCTION=true tsc -p ./ && vsce package",
     "package": "vsce package"
   },
   "devDependencies": {

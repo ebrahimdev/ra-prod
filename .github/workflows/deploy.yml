@@ -22,15 +22,16 @@ jobs:
       run: |
         cd quill
         npm ci --prefer-offline
-        npm run compile
         # Increment version first
         CURRENT_VERSION=$(node -p "require('./package.json').version")
         IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
         PATCH_VERSION=$((${VERSION_PARTS[2]} + 1))
         NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH_VERSION"
         npm version $NEW_VERSION --no-git-tag-version
-        # Build VSIX with npx (cached)
-        npx --yes @vscode/vsce@latest package
+        # Build with production flag
+        npm run build:prod
+      env:
+        QUILL_PRODUCTION: true
     
     - name: Upload Quill Artifact
       uses: actions/upload-artifact@v4

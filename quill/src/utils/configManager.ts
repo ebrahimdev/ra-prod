@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { Logger } from './logger';
+import { BUILD_CONFIG } from '../config/buildConfig';
 
 export class ConfigManager {
     private static instance: ConfigManager;
@@ -13,28 +15,18 @@ export class ConfigManager {
     }
 
     getAuthServerUrl(): string {
-        const config = vscode.workspace.getConfiguration('quill');
-        return config.get('authServerUrl', 'http://localhost:5000');
+        Logger.info(`Using build config - isProduction: ${BUILD_CONFIG.isProduction}`);
+        Logger.info(`Auth server URL: ${BUILD_CONFIG.authServerUrl}`);
+        return BUILD_CONFIG.authServerUrl;
     }
 
     getRagServerUrl(): string {
-        const config = vscode.workspace.getConfiguration('quill');
-        return config.get('ragServerUrl', 'http://localhost:5001');
+        Logger.info(`RAG server URL: ${BUILD_CONFIG.ragServerUrl}`);
+        return BUILD_CONFIG.ragServerUrl;
     }
     
     isProductionBuild(): boolean {
-        // This will be set during production build process
-        return process.env.QUILL_PRODUCTION === 'true';
-    }
-    
-    getProductionConfig() {
-        if (this.isProductionBuild()) {
-            return {
-                authServerUrl: 'http://45.76.61.43:5000',
-                ragServerUrl: 'http://45.76.61.43:5001'
-            };
-        }
-        return null;
+        return BUILD_CONFIG.isProduction;
     }
 }
 

@@ -4,8 +4,12 @@ import { DashboardProvider } from './providers/dashboardProvider';
 import { SearchResultsEditorProvider } from './providers/searchResultsEditorProvider';
 import { ChatEditorProvider } from './providers/chatEditorProvider';
 import { StatusBarProvider } from './providers/statusBarProvider';
+import { Logger } from './utils/logger';
 
 export function activate(context: vscode.ExtensionContext) {
+    // Initialize logger
+    Logger.initialize('Quill');
+    Logger.info('Quill extension is starting up...');
     const commandManager = new CommandManager(context);
     commandManager.registerCommands(context);
 
@@ -39,6 +43,11 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push({
         dispose: () => statusBarProvider.dispose()
     });
+
+    Logger.info('Quill extension activated successfully');
 }
 
-export function deactivate() {}
+export function deactivate() {
+    Logger.info('Quill extension is deactivating...');
+    Logger.dispose();
+}

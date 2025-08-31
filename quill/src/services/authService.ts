@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import { configManager } from '../utils/configManager';
+import { Logger } from '../utils/logger';
 
 export interface User {
     id: number;
@@ -23,7 +24,10 @@ export class AuthService {
 
     private getAuthServerUrl(): string {
         const prodConfig = configManager.getProductionConfig();
-        return prodConfig ? prodConfig.authServerUrl : configManager.getAuthServerUrl();
+        const url = prodConfig ? prodConfig.authServerUrl : configManager.getAuthServerUrl();
+        Logger.info(`Using auth server URL: ${url}`);
+        Logger.info(`Is production build: ${configManager.isProductionBuild()}`);
+        return url;
     }
 
     async login(email: string, password: string): Promise<{ user: User; tokens: AuthTokens }> {
@@ -41,19 +45,40 @@ export class AuthService {
     }
 
     async register(email: string, password: string, firstName: string, lastName: string): Promise<{ user: User; tokens: AuthTokens }> {
-        const response = await axios.post(`${this.getAuthServerUrl()}/api/auth/register`, {
-            email,
-            password,
-            first_name: firstName,
-            last_name: lastName
-        });
-
-        const { user, access_token, refresh_token } = response.data;
+        const authServerUrl = this.getAuthServerUrl();
+        const endpoint = `${authServerUrl}/api/auth/register`;
         
-        await this.storeTokens({ access_token, refresh_token });
-        await this.storeUser(user);
+        Logger.info(`Attempting registration to: ${endpoint}`);
+        Logger.info(`Registration data: email=${email}, firstName=${firstName}, lastName=${lastName}`);
+        
+        try {
+            const response = await axios.post(endpoint, {
+                email,
+                password,
+                first_name: firstName,
+                last_name: lastName
+            });
 
-        return { user, tokens: { access_token, refresh_token } };
+            Logger.info(`Registration response status: ${response.status}`);
+            Logger.info(`Registration response data: ${JSON.stringify(response.data)}`);
+
+            const { user, access_token, refresh_token } = response.data;
+            
+            await this.storeTokens({ access_token, refresh_token });
+            await this.storeUser(user);
+
+            return { user, tokens: { access_token, refresh_token } };
+        } catch (error: any) {
+            Logger.error(`Registration axios error: ${error.message}`);
+            if (error.response) {
+                Logger.error(`Response status: ${error.response.status}`);
+                Logger.error(`Response data: ${JSON.stringify(error.response.data)}`);
+            } else if (error.request) {
+                Logger.error(`No response received from server`);
+                Logger.error(`Request details: ${JSON.stringify(error.config)}`);
+            }
+            throw error;
+        }
     }
 
     async getStoredTokens(): Promise<AuthTokens | null> {
