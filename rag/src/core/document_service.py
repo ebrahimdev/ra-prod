@@ -7,7 +7,7 @@ from ..models.document import Document, DocumentChunk
 from ..pdf.extractor import PDFExtractor
 from ..pdf.chunker import DocumentChunker
 from ..vectorization.embeddings import EmbeddingService
-from ..llm.client import OpenChatClient
+from ..llm.client import FailoverLLMClient
 from ..utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -18,7 +18,7 @@ class DocumentService:
         self.pdf_extractor = PDFExtractor()
         self.chunker = DocumentChunker()
         self.embedding_service = EmbeddingService()
-        self.llm_client = OpenChatClient()
+        self.llm_client = FailoverLLMClient()
     
     def upload_document(self, user_id: int, file_path: str, filename: str) -> Document:
         """Upload and process a new document."""

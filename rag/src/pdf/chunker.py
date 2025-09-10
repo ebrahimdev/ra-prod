@@ -1,7 +1,7 @@
 import re
 from typing import List, Dict, Any, Tuple
 from ..utils.logger import setup_logger
-from ..llm.client import OpenChatClient
+from ..llm.client import FailoverLLMClient
 
 logger = setup_logger(__name__)
 
@@ -10,7 +10,7 @@ class DocumentChunker:
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.min_chunk_size = min_chunk_size  # Prevent micro-chunks
-        self.llm_client = OpenChatClient()
+        self.llm_client = FailoverLLMClient()
         
         # Target distribution for balanced chunking
         self.target_distribution = {

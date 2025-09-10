@@ -1,3 +1,3 @@
-from .client import OpenChatClient, LLMResponse
+from .client import OpenChatClient, OpenRouterClient, FailoverLLMClient, LLMResponse
 
-__all__ = ['OpenChatClient', 'LLMResponse']
+__all__ = ['OpenChatClient', 'OpenRouterClient', 'FailoverLLMClient', 'LLMResponse']

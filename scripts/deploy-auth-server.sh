@@ -80,12 +80,50 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
     fi
     mv /opt/ra-prod/auth-server/new /opt/ra-prod/auth-server/current
     
-    echo "🔧 Recreating virtual environment with correct paths"
+    echo "🔧 Setting up persistent database and environment"
+    
+    # Create persistent data directory outside deployment path
+    mkdir -p /opt/ra-prod/data
+    chmod 755 /opt/ra-prod/data
+    
+    # Create .env file with absolute database path
     cd /opt/ra-prod/auth-server/current
+    cat > .env << 'ENVFILE'
+FLASK_ENV=production
+DATABASE_URL=sqlite:////opt/ra-prod/data/auth.db
+HOST=0.0.0.0
+PORT=5000
+ENVFILE
+    
+    echo "🔧 Setting up virtual environment with caching"
     rm -rf venv
     python3.10 -m venv venv
     ./venv/bin/pip install --upgrade pip
-    ./venv/bin/pip install --no-cache-dir -r requirements.txt
+    
+    # Use persistent pip cache
+    export PIP_CACHE_DIR="/opt/ra-prod/.pip-cache"
+    mkdir -p "$PIP_CACHE_DIR"
+    ./venv/bin/pip install --cache-dir="$PIP_CACHE_DIR" -r requirements.txt
+    
+    echo "🗃️ Initializing persistent database"
+    # Install sqlite3 if needed
+    apt-get update && apt-get install -y sqlite3
+    
+    # Create database with proper permissions if it doesn't exist
+    if [ ! -f "/opt/ra-prod/data/auth.db" ]; then
+        touch /opt/ra-prod/data/auth.db
+        chmod 666 /opt/ra-prod/data/auth.db
+    fi
+    
+    # Initialize database tables using the app
+    ./venv/bin/python -c "
+from app import create_app
+from src.models.database import db
+app = create_app()
+with app.app_context():
+    db.create_all()
+    print('✅ Database tables initialized')
+"
 EOF
 
 # Install/update systemd service if it doesn't exist
@@ -140,7 +178,28 @@ ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST << 'EOF'
         # Test health endpoint
         echo "🔍 Testing health endpoint..."
         sleep 5
-        curl -f http://localhost:5000/health || echo "⚠️ Health endpoint not responding yet"
+        if curl -f http://localhost:5000/health > /dev/null 2>&1; then
+            echo "✅ Health endpoint working"
+        else
+            echo "❌ Health endpoint failed"
+            exit 1
+        fi
+        
+        # Test registration endpoint with dummy data
+        echo "🧪 Testing registration endpoint..."
+        REGISTRATION_TEST=$(curl -s -X POST http://localhost:5000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email": "deploy-test@example.com", "password": "testpass123", "first_name": "Deploy", "last_name": "Test"}')
+        
+        if echo "$REGISTRATION_TEST" | grep -q "access_token"; then
+            echo "✅ Registration endpoint working correctly"
+        elif echo "$REGISTRATION_TEST" | grep -q "Email already registered"; then
+            echo "✅ Registration endpoint working (user already exists)"
+        else
+            echo "❌ Registration endpoint failed:"
+            echo "$REGISTRATION_TEST"
+            exit 1
+        fi
     else
         echo "❌ Auth Server failed to start"
         echo "📊 Service status:"
