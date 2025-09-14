@@ -13,6 +13,7 @@ tmux split-window -v
 # Left pane: RAG server
 tmux select-pane -t 0
 tmux send-keys 'cd rag' C-m
+tmux send-keys 'if [ ! -d "venv" ]; then python3.10 -m venv venv; fi' C-m
 tmux send-keys 'source venv/bin/activate' C-m
 tmux send-keys 'pip install -r requirements.txt' C-m
 tmux send-keys 'python app.py' C-m
@@ -20,6 +21,7 @@ tmux send-keys 'python app.py' C-m
 # Right top pane: Auth server
 tmux select-pane -t 1
 tmux send-keys 'cd auth-server' C-m
+tmux send-keys 'if [ ! -d "venv" ]; then python3.10 -m venv venv; fi' C-m
 tmux send-keys 'source venv/bin/activate' C-m
 tmux send-keys 'pip install -r requirements.txt' C-m
 tmux send-keys 'python app.py' C-m
