@@ -3,8 +3,10 @@ from flask import request, jsonify
 import jwt
 import requests
 from ..utils.logger import setup_logger
+from config.settings import Settings
 
 logger = setup_logger(__name__)
+settings = Settings()
 
 def require_auth(f):
     @wraps(f)
@@ -18,7 +20,7 @@ def require_auth(f):
             
             token = auth_header.split(' ')[1]
             
-            auth_server_url = "http://localhost:8001"
+            auth_server_url = settings.AUTH_SERVER_URL
             response = requests.get(
                 f"{auth_server_url}/api/auth/me",
                 headers={"Authorization": f"Bearer {token}"}
