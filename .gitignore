@@ -21,11 +21,13 @@ build/
 .env.production.local
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# Keep VS Code extension development configs
+!quill/.vscode/
 
 # OS
 .DS_Store
