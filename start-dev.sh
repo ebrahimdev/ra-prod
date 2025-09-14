@@ -29,6 +29,7 @@ tmux send-keys 'python app.py' C-m
 # Right bottom pane: Quill directory
 tmux select-pane -t 2
 tmux send-keys 'cd quill' C-m
+tmux send-keys 'npm install' C-m
 tmux send-keys 'npm run compile' C-m
 tmux send-keys 'npm run watch' C-m
 

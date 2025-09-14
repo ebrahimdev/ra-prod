@@ -85,10 +85,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "node scripts/generate-build-config.js && tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "node scripts/generate-build-config.js && npx tsc -p ./",
+    "watch": "npx tsc -watch -p ./",
     "build": "node build.js",
-    "build:prod": "QUILL_PRODUCTION=true node scripts/generate-build-config.js && QUILL_PRODUCTION=true tsc -p ./ && npx @vscode/vsce package",
+    "build:prod": "QUILL_PRODUCTION=true node scripts/generate-build-config.js && QUILL_PRODUCTION=true npx tsc -p ./ && npx @vscode/vsce package",
     "package": "vsce package"
   },
   "devDependencies": {
