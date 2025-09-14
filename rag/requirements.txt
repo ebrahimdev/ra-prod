@@ -13,7 +13,8 @@ PyMuPDF==1.23.14
 pdfplumber==0.10.3
 
 # NLP and Embeddings (CPU-only versions)
-torch==2.3.0+cpu
+torch==2.1.1
+torchvision==0.16.1
 sentence-transformers==2.4.0
 transformers==4.35.2
 numpy==1.24.3
