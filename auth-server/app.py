@@ -18,6 +18,9 @@ def create_app():
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = settings.JWT_ACCESS_TOKEN_EXPIRES
     app.config['JWT_REFRESH_TOKEN_EXPIRES'] = settings.JWT_REFRESH_TOKEN_EXPIRES
     
+    # Session configuration for OAuth state management
+    app.config['SECRET_KEY'] = settings.JWT_SECRET_KEY  # Use same secret for sessions
+    
     db.init_app(app)
     migrate.init_app(app, db)
     jwt = JWTManager(app)

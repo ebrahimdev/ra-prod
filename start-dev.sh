@@ -26,12 +26,10 @@ tmux send-keys 'source venv/bin/activate' C-m
 tmux send-keys 'pip install -r requirements.txt' C-m
 tmux send-keys 'python app.py' C-m
 
-# Right bottom pane: Quill directory
+# Right bottom pane: tex-gpt directory
 tmux select-pane -t 2
-tmux send-keys 'cd quill' C-m
+tmux send-keys 'cd texgpt' C-m
 tmux send-keys 'npm install' C-m
-tmux send-keys 'npm run compile' C-m
-tmux send-keys 'npm run watch' C-m
 
 # Attach to the session
 tmux attach-session -t ra-prod
