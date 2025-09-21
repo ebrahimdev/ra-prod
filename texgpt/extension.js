@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const DashboardProvider = require('./src/providers/dashboardProvider');
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -95,6 +96,10 @@ function activate(context) {
 			vscode.window.showErrorMessage(`Sign-up failed: ${error.message}`);
 		}
 	});
+
+	// Register dashboard provider
+	const dashboardProvider = new DashboardProvider(context);
+	vscode.window.registerWebviewViewProvider('texgpt.dashboard', dashboardProvider);
 
 	context.subscriptions.push(disposable, signupDisposable);
 }

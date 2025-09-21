@@ -1,0 +1,11 @@
+body {
+    padding: 20px;
+    font-family: var(--vscode-font-family);
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+}
+
+#signup-btn {
+    width: 100%;
+    margin-bottom: 10px;
+}

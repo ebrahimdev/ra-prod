@@ -1,0 +1,16 @@
+body {
+    padding: 20px;
+    font-family: var(--vscode-font-family);
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    margin: 0;
+}
+
+.container {
+    max-width: 100%;
+}
+
+vscode-button {
+    width: 100%;
+    margin-bottom: 10px;
+}
