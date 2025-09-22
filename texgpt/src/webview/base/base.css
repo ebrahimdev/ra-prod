@@ -6,6 +6,16 @@ body {
     margin: 0;
 }
 
+.btn {
+    width: fit-content;
+    margin-left: 6px;
+    margin-right: 6px;
+}
+
+.text-field {
+    margin-bottom: 8px;
+}
+
 .container {
     max-width: 100%;
 }

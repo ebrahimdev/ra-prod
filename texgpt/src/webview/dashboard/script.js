@@ -1,6 +1,6 @@
 const vscode = acquireVsCodeApi();
 
-document.getElementById('signup-btn').addEventListener('click', () => {
+document.getElementById('signup-google-btn').addEventListener('click', () => {
     vscode.postMessage({
         command: 'signup'
     });

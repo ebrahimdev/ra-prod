@@ -1,3 +1,16 @@
 <div class="dashboard-container">
-    <vscode-button appearance="primary" id="signup-btn">Sign Up</vscode-button>
+    <div class="signin-container">
+        <h1>Get started</h1>
+        <p>Sign up or login to start using TeXGPT</p>
+        <div class="signin-text-container">
+            <vscode-text-field class="text-field" type="email" placeholder="Email"></vscode-text-field>
+            <vscode-text-field class="text-field" type="password" placeholder="Password"></vscode-text-field>
+        </div>
+        <div class="signin-btn-container">
+            <vscode-button class="btn" id="signup-btn">Sign up</vscode-button>
+            <vscode-button class="btn" appearance="secondary" id="login-btn">Log in</vscode-button>
+        </div>
+        <vscode-button appearance="primary" id="signup-google-btn">Sign in with Google</vscode-button>
+        <p>texgpt.com</p>
+    </div>
 </div>

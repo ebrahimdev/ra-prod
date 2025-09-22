@@ -19,7 +19,7 @@
         "title": "Hello World"
       },
       {
-        "command": "texgpt.signup",
+        "command": "texgpt.signupGoogle",
         "title": "TeXGPT: Sign Up with Google"
       }
     ],
