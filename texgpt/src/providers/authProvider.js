@@ -2,16 +2,12 @@ const vscode = require('vscode');
 const path = require('path');
 const BaseWebviewProvider = require('./baseWebviewProvider');
 
-class DashboardProvider extends BaseWebviewProvider {
-    constructor(context, emailAuthService) {
+class AuthProvider extends BaseWebviewProvider {
+    constructor(context) {
         super(context);
-        this.emailAuthService = emailAuthService;
-        this.webviewView = null;
     }
 
     resolveWebviewView(webviewView) {
-        this.webviewView = webviewView;
-
         webviewView.webview.options = {
             enableScripts: true,
             enableCommandUris: true,
@@ -23,31 +19,22 @@ class DashboardProvider extends BaseWebviewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        webviewView.webview.onDidReceiveMessage(async message => {
+        webviewView.webview.onDidReceiveMessage(message => {
             switch (message.command) {
-                case 'requestUserData':
-                    await this.sendUserData();
+                case 'signup':
+                    vscode.commands.executeCommand('texgpt.signup');
                     break;
-                case 'logout':
-                    vscode.commands.executeCommand('texgpt.logout');
+                case 'signupWithEmail':
+                    vscode.commands.executeCommand('texgpt.signupWithEmail', message.email, message.password);
+                    break;
+                case 'loginWithEmail':
+                    vscode.commands.executeCommand('texgpt.loginWithEmail', message.email, message.password);
+                    break;
+                case 'showError':
+                    vscode.window.showErrorMessage(message.message);
                     break;
             }
         });
-
-        // Send initial user data
-        this.sendUserData();
-    }
-
-    async sendUserData() {
-        if (this.webviewView && this.emailAuthService) {
-            const user = await this.emailAuthService.getCurrentUser();
-            if (user) {
-                this.webviewView.webview.postMessage({
-                    command: 'setUser',
-                    user: user
-                });
-            }
-        }
     }
 
     _getHtmlForWebview(webview) {
@@ -55,16 +42,16 @@ class DashboardProvider extends BaseWebviewProvider {
         const layoutPath = path.join(this._context.extensionPath, 'src', 'webview', 'base', 'layout.html');
         const layout = this.loadTemplate(layoutPath);
 
-        // Load dashboard content
-        const contentPath = path.join(this._context.extensionPath, 'src', 'webview', 'dashboard', 'index.html');
+        // Load auth content
+        const contentPath = path.join(this._context.extensionPath, 'src', 'webview', 'auth', 'index.html');
         const content = this.loadTemplate(contentPath);
 
         // Create resource URIs
         const replacements = {
             toolkitUri: this.getToolkitUri(webview).toString(),
             baseStyleUri: this.createResourceUri('src/webview/base/base.css', webview).toString(),
-            componentStyleUri: this.createResourceUri('src/webview/dashboard/styles.css', webview).toString(),
-            componentScriptUri: this.createResourceUri('src/webview/dashboard/script.js', webview).toString(),
+            componentStyleUri: this.createResourceUri('src/webview/auth/styles.css', webview).toString(),
+            componentScriptUri: this.createResourceUri('src/webview/auth/script.js', webview).toString(),
             content: content
         };
 
@@ -72,4 +59,4 @@ class DashboardProvider extends BaseWebviewProvider {
     }
 }
 
-module.exports = DashboardProvider;
+module.exports = AuthProvider;

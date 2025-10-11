@@ -1,26 +1,12 @@
-body {
-    padding: 20px;
-    font-family: var(--vscode-font-family);
-    background-color: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    text-align: center;
+.user-info {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+    opacity: 0.8;
 }
 
-
-.dashboard-container {
-    display: flex;
-    height: 100vh;
-    align-items: center;
-    justify-content: center;
-}
-
-.signin-btn-container {
-    display: flex;
-    justify-content: center;
-}
-
-.signin-text-container {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 16px;
+#user-email {
+    font-weight: 500;
 }
