@@ -22,19 +22,19 @@ def health_check():
 def register():
     try:
         data = request.get_json()
-        
-        required_fields = ['email', 'password', 'first_name', 'last_name']
+
+        required_fields = ['email', 'password']
         if not all(field in data for field in required_fields):
             return jsonify({"error": "Missing required fields"}), 400
-        
+
         if User.query.filter_by(email=data['email']).first():
             return jsonify({"error": "Email already registered"}), 400
-        
+
         user = auth_service.create_user(
             email=data['email'],
             password=data['password'],
-            first_name=data['first_name'],
-            last_name=data['last_name']
+            first_name=data.get('first_name', ''),
+            last_name=data.get('last_name', '')
         )
         
         access_token = create_access_token(identity=str(user.id))

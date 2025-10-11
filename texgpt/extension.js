@@ -4,7 +4,9 @@ const vscode = require('vscode');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const AuthProvider = require('./src/providers/authProvider');
 const DashboardProvider = require('./src/providers/dashboardProvider');
+const EmailAuthService = require('./src/services/emailAuthService');
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -97,11 +99,87 @@ function activate(context) {
 		}
 	});
 
-	// Register dashboard provider
-	const dashboardProvider = new DashboardProvider(context);
-	vscode.window.registerWebviewViewProvider('texgpt.dashboard', dashboardProvider);
+	// Initialize email auth service
+	const emailAuthService = new EmailAuthService(context);
 
-	context.subscriptions.push(disposable, signupDisposable);
+	// Register email signup command
+	const signupEmailDisposable = vscode.commands.registerCommand('texgpt.signupWithEmail', async function (email, password) {
+		try {
+			vscode.window.showInformationMessage('Creating your account...');
+
+			const result = await emailAuthService.register(email, password);
+
+			if (result.success) {
+				const userName = result.user.first_name || result.user.email.split('@')[0];
+				vscode.window.showInformationMessage(`Welcome to TeXGPT, ${userName}! Your account has been created successfully.`);
+
+				// Reload window to switch to dashboard view
+				vscode.commands.executeCommand('workbench.action.reloadWindow');
+			} else {
+				vscode.window.showErrorMessage(`Signup failed: ${result.error}`);
+			}
+		} catch (error) {
+			console.error('Error during email signup:', error);
+			vscode.window.showErrorMessage(`Signup failed: ${error.message}`);
+		}
+	});
+
+	// Register email login command
+	const loginEmailDisposable = vscode.commands.registerCommand('texgpt.loginWithEmail', async function (email, password) {
+		try {
+			vscode.window.showInformationMessage('Signing you in...');
+
+			const result = await emailAuthService.login(email, password);
+
+			if (result.success) {
+				const userName = result.user.first_name || result.user.email.split('@')[0];
+				vscode.window.showInformationMessage(`Welcome back, ${userName}!`);
+
+				// Reload window to switch to dashboard view
+				vscode.commands.executeCommand('workbench.action.reloadWindow');
+			} else {
+				vscode.window.showErrorMessage(`Login failed: ${result.error}`);
+			}
+		} catch (error) {
+			console.error('Error during email login:', error);
+			vscode.window.showErrorMessage(`Login failed: ${error.message}`);
+		}
+	});
+
+	// Register logout command
+	const logoutDisposable = vscode.commands.registerCommand('texgpt.logout', async function () {
+		try {
+			await emailAuthService.clearStoredData();
+			vscode.window.showInformationMessage('You have been logged out successfully.');
+
+			// Reload window to switch back to auth view
+			vscode.commands.executeCommand('workbench.action.reloadWindow');
+		} catch (error) {
+			console.error('Error during logout:', error);
+			vscode.window.showErrorMessage(`Logout failed: ${error.message}`);
+		}
+	});
+
+	// View provider management
+	let currentViewProvider = null;
+
+	async function registerViewProvider() {
+		const isAuthenticated = await emailAuthService.isAuthenticated();
+
+		if (isAuthenticated) {
+			currentViewProvider = new DashboardProvider(context, emailAuthService);
+		} else {
+			currentViewProvider = new AuthProvider(context);
+		}
+
+		const viewProviderDisposable = vscode.window.registerWebviewViewProvider('texgpt.view', currentViewProvider);
+		context.subscriptions.push(viewProviderDisposable);
+	}
+
+	// Initial view registration
+	registerViewProvider();
+
+	context.subscriptions.push(disposable, signupDisposable, signupEmailDisposable, loginEmailDisposable, logoutDisposable);
 }
 
 // This method is called when your extension is deactivated
