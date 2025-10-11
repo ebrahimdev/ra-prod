@@ -27,47 +27,37 @@ const LoginForm = () => {
   return (
     <form onSubmit={handleSubmit} className="auth-form">
       <div className="auth-form-fields">
-        <div className="input-wrapper">
-          <VSCodeTextField
-            type="email"
-            value={email}
-            onInput={(e) => {
-              setEmail(e.target.value);
-              if (errors.email) setErrors({ ...errors, email: null });
-            }}
-            placeholder="Email"
-            className="input-full-width"
-          />
-          {errors.email && <span className="input-error-text">{errors.email}</span>}
-        </div>
-        <div className="input-wrapper">
-          <VSCodeTextField
-            type="password"
-            value={password}
-            onInput={(e) => {
-              setPassword(e.target.value);
-              if (errors.password) setErrors({ ...errors, password: null });
-            }}
-            placeholder="Password"
-            className="input-full-width"
-          />
-          {errors.password && <span className="input-error-text">{errors.password}</span>}
-        </div>
+        <VSCodeTextField
+          type="email"
+          value={email}
+          onInput={(e) => {
+            setEmail(e.target.value);
+            if (errors.email) setErrors({ ...errors, email: null });
+          }}
+          placeholder="Email"
+          className="input-full-width"
+        />
+        {errors.email && <span className="input-error-text">{errors.email}</span>}
+        <VSCodeTextField
+          type="password"
+          value={password}
+          onInput={(e) => {
+            setPassword(e.target.value);
+            if (errors.password) setErrors({ ...errors, password: null });
+          }}
+          placeholder="Password"
+          className="input-full-width"
+        />
+        {errors.password && <span className="input-error-text">{errors.password}</span>}
       </div>
-
-      {authError && (
-        <div className="auth-error">
-          {authError}
-        </div>
-      )}
 
       <VSCodeButton
         type="submit"
         appearance="primary"
-        className="btn-primary btn-full-width"
         disabled={loading}
+        className="signup-btn"
       >
-        {loading ? 'Logging in...' : 'Log in'}
+        <b>Log in</b>
       </VSCodeButton>
     </form>
   );
