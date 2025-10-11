@@ -32,7 +32,21 @@ const AuthPage = () => {
           {isSignup ? <SignupForm /> : <LoginForm />}
           <div className="auth-toggle">
             <p>
-              Already have an account? Log in
+              {isSignup ? (
+                <>
+                  Already have an account?{' '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); setIsSignup(false); }} className="auth-link">
+                    Log in
+                  </a>
+                </>
+              ) : (
+                <>
+                  Don't have an account?{' '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); setIsSignup(true); }} className="auth-link">
+                    Sign up
+                  </a>
+                </>
+              )}
             </p>
           </div>
         </div>
