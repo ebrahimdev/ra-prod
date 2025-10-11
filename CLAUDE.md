@@ -35,8 +35,16 @@ pytest
 ```bash
 cd texgpt
 npm install
+
+# Build the React webview
+npm run build:webview
+
+# Lint and test
 npm run lint
 npm test
+
+# Development mode (optional)
+npm run dev:webview
 ```
 
 ### Development Environment
@@ -69,12 +77,15 @@ This creates a tmux session with:
 
 ### TeXGPT Extension
 - VSCode extension for academic research
+- **React-based SPA** with client-side routing (React Router)
+- Single unified webview using ReactWebviewProvider
 - Webview-based dashboard with dual authentication options
 - Email/password authentication via EmailAuthService
 - Google OAuth authentication integration
 - Connects to auth and RAG servers
 - Uses axios for HTTP requests
 - Secure token storage using VSCode Secrets API
+- Modern component architecture with React hooks and Context API
 
 ## Configuration
 
@@ -92,7 +103,8 @@ This creates a tmux session with:
 ## Key Technologies
 
 - **Backend**: Flask, SQLAlchemy, PyJWT, sentence-transformers
-- **Frontend**: VSCode Extension API, Webview UI Toolkit
+- **Frontend**: React 19, React Router 6, VSCode Extension API
+- **Build Tools**: Vite 6 (for webview bundling)
 - **Database**: SQLite
 - **Authentication**: Google OAuth 2.0, Email/Password, JWT tokens
 - **Document Processing**: PyMuPDF, pdfplumber
@@ -106,18 +118,28 @@ This creates a tmux session with:
 - **Auth Routes** (`auth-server/src/api/auth_routes.py`): REST endpoints for registration, login, refresh, and OAuth
 
 ### Frontend Components (TeXGPT Extension)
+- **React App** (`texgpt/webview-ui/src/`): Single Page Application with routing
+  - **AuthContext** (`contexts/AuthContext.jsx`): Global authentication state management
+  - **useAuth hook** (`hooks/useAuth.js`): Custom hook for accessing auth state
+  - **useVSCode hook** (`hooks/useVSCode.js`): VSCode messaging communication
+  - **Auth Pages** (`pages/Auth/`): Login/Signup forms with validation
+  - **Dashboard Page** (`pages/Dashboard/`): Main dashboard view
+- **ReactWebviewProvider** (`texgpt/src/providers/reactWebviewProvider.js`): Unified webview provider serving React app
 - **EmailAuthService** (`texgpt/src/services/emailAuthService.js`): Handles email/password authentication API calls
-- **Dashboard Provider** (`texgpt/src/providers/dashboardProvider.js`): Manages webview communication for auth commands
-- **Dashboard Script** (`texgpt/src/webview/dashboard/script.js`): Client-side form validation and user interaction
 - **Extension Commands** (`texgpt/extension.js`): VSCode command handlers for authentication actions
 
 ### Authentication Flow
-1. User enters credentials in dashboard webview
-2. Dashboard script validates input and sends message to provider
-3. Provider executes VSCode command with user data
-4. EmailAuthService makes API call to auth server
-5. Successful authentication stores JWT tokens securely
-6. User session persists across extension restarts
+1. User enters credentials in React auth form (SignupForm/LoginForm)
+2. Form validates input using validation utils
+3. Form calls auth function from useAuth hook (AuthContext)
+4. AuthContext sends message via useVSCode hook
+5. ReactWebviewProvider receives message and executes VSCode command
+6. EmailAuthService makes API call to auth server
+7. Successful authentication stores JWT tokens securely via VSCode Secrets API
+8. Extension sends user data back to React via postMessage
+9. AuthContext updates state, triggering UI re-render
+10. User is redirected to dashboard via React Router
+11. User session persists across extension restarts
 
 ### Token Management
 - Access tokens stored using VSCode Secrets API
@@ -127,10 +149,26 @@ This creates a tmux session with:
 
 ## Development Patterns
 
+### Backend (Python/Flask)
 - Both Flask apps follow modular architecture with separate `api/`, `core/`, `models/`, and `middleware/` directories
 - Use of Python virtual environments for isolation
 - Configuration management through environment files
 - RESTful API design patterns
 - JWT-based authentication between services
-- Extension uses command pattern for authentication actions
-- Webview communication via message passing
+
+### Frontend (React/TypeScript)
+- **React SPA Architecture**: Single Page Application with client-side routing
+- **Component-based**: Reusable components in `components/common/`
+- **Page-based routing**: Route-level components in `pages/`
+- **Context API**: Global state management (AuthContext)
+- **Custom Hooks**: useAuth, useVSCode for reusable logic
+- **Functional Components**: Modern React with hooks (useState, useEffect, useCallback)
+- **Declarative UI**: React component composition
+- **Message Passing**: Webview ↔ Extension communication via postMessage
+- **VSCode Integration**: Seamless theme integration using CSS variables
+
+### Build & Development
+- **Vite**: Fast bundler with HMR (Hot Module Replacement)
+- **Development Mode**: `npm run dev:webview` for live reload
+- **Production Build**: `npm run build:webview` creates optimized bundles
+- **Build Output**: Bundled app in `dist/webview-ui/` (gitignored)

@@ -1,0 +1,13 @@
+.input-full-width {
+  width: 100%;
+}
+
+.auth-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px
+}
+
+.signup-btn {
+  width: fit-content;
+}
