@@ -68,18 +68,26 @@
   "scripts": {
     "lint": "eslint .",
     "pretest": "npm run lint",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "build:webview": "cd webview-ui && npm run build",
+    "watch:webview": "cd webview-ui && npm run watch",
+    "dev:webview": "cd webview-ui && npm run dev"
   },
   "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0",
     "axios": "^1.6.0",
-    "@vscode/webview-ui-toolkit": "^1.4.0"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
-    "@types/vscode": "^1.104.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "eslint": "^9.25.1",
+    "@types/vscode": "^1.104.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "vite": "^6.3.6"
   }
 }

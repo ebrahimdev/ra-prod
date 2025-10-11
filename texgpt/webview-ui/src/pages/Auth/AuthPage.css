@@ -1,0 +1,45 @@
+.auth-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-container {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  max-width: 183px;
+}
+
+.auth-header {
+  text-align: center;
+  width: 100%;
+}
+
+.auth-form {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.auth-toggle {
+  font-size: 11px;
+}
+
+.auth-header,
+.auth-form,
+.saml-auth {
+  width: 100%;
+}
+
+.google-auth-btn {
+  margin: auto;
+}
+
+b1 {
+  font-weight: 500;
+  font-size: 13px;
+}

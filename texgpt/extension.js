@@ -4,8 +4,7 @@ const vscode = require('vscode');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const AuthProvider = require('./src/providers/authProvider');
-const DashboardProvider = require('./src/providers/dashboardProvider');
+const ReactWebviewProvider = require('./src/providers/reactWebviewProvider');
 const EmailAuthService = require('./src/services/emailAuthService');
 
 // This method is called when your extension is activated
@@ -160,24 +159,10 @@ function activate(context) {
 		}
 	});
 
-	// View provider management
-	let currentViewProvider = null;
-
-	async function registerViewProvider() {
-		const isAuthenticated = await emailAuthService.isAuthenticated();
-
-		if (isAuthenticated) {
-			currentViewProvider = new DashboardProvider(context, emailAuthService);
-		} else {
-			currentViewProvider = new AuthProvider(context);
-		}
-
-		const viewProviderDisposable = vscode.window.registerWebviewViewProvider('texgpt.view', currentViewProvider);
-		context.subscriptions.push(viewProviderDisposable);
-	}
-
-	// Initial view registration
-	registerViewProvider();
+	// Register the unified React webview provider
+	const reactWebviewProvider = new ReactWebviewProvider(context, emailAuthService);
+	const viewProviderDisposable = vscode.window.registerWebviewViewProvider('texgpt.view', reactWebviewProvider);
+	context.subscriptions.push(viewProviderDisposable);
 
 	context.subscriptions.push(disposable, signupDisposable, signupEmailDisposable, loginEmailDisposable, logoutDisposable);
 }

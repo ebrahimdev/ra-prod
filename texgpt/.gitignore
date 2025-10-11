@@ -1,0 +1,20 @@
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+
+# VS Code
+.vscode-test/
+*.vsix
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
