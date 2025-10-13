@@ -5,7 +5,20 @@
 .auth-form-fields {
   display: flex;
   flex-direction: column;
+  width: 100%;
   gap: 12px
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-error-text {
+  color: var(--vscode-errorForeground, #f48771);
+  font-size: 11px;
+  margin-top: 4px;
+  display: block;
 }
 
 .signup-btn {

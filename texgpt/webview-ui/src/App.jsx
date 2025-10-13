@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
 import AuthPage from './pages/Auth/AuthPage';
+import OnboardingPage from './pages/Onboarding/OnboardingPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import NotFound from './pages/NotFound';
 import './styles/global.css';
@@ -16,6 +17,14 @@ function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route
+              path="/onboarding"
+              element={
+                <PrivateRoute>
+                  <OnboardingPage />
+                </PrivateRoute>
+              }
+            />
             <Route
               path="/dashboard"
               element={

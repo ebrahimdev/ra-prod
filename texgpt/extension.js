@@ -48,6 +48,7 @@ function activate(context) {
 				const userFirstName = params.get('user_first_name');
 				const userLastName = params.get('user_last_name');
 				const userId = params.get('user_id');
+				const isNewUser = params.get('is_new_user') === 'true';
 
 				if (accessToken && refreshToken) {
 					// Store tokens securely
@@ -57,6 +58,11 @@ function activate(context) {
 					context.globalState.update('texgpt.userFirstName', userFirstName);
 					context.globalState.update('texgpt.userLastName', userLastName);
 					context.globalState.update('texgpt.userId', userId);
+
+					// Mark onboarding status for new users
+					if (isNewUser) {
+						context.globalState.update('texgpt.hasSeenOnboarding', false);
+					}
 
 					vscode.window.showInformationMessage(`Welcome to TeXGPT, ${userFirstName}! You are now signed in.`);
 				} else {
@@ -112,7 +118,10 @@ function activate(context) {
 				const userName = result.user.first_name || result.user.email.split('@')[0];
 				vscode.window.showInformationMessage(`Welcome to TeXGPT, ${userName}! Your account has been created successfully.`);
 
-				// Reload window to switch to dashboard view
+				// Mark as first-time user (they haven't seen onboarding yet)
+				context.globalState.update('texgpt.hasSeenOnboarding', false);
+
+				// Reload window to switch to onboarding view
 				vscode.commands.executeCommand('workbench.action.reloadWindow');
 			} else {
 				vscode.window.showErrorMessage(`Signup failed: ${result.error}`);
@@ -145,10 +154,21 @@ function activate(context) {
 		}
 	});
 
+	// Register the unified React webview provider
+	const reactWebviewProvider = new ReactWebviewProvider(context, emailAuthService);
+
 	// Register logout command
 	const logoutDisposable = vscode.commands.registerCommand('texgpt.logout', async function () {
 		try {
 			await emailAuthService.clearStoredData();
+
+			// Send logout message to webview before reloading
+			if (reactWebviewProvider.webviewView) {
+				reactWebviewProvider.webviewView.webview.postMessage({
+					command: 'logout'
+				});
+			}
+
 			vscode.window.showInformationMessage('You have been logged out successfully.');
 
 			// Reload window to switch back to auth view
@@ -158,9 +178,6 @@ function activate(context) {
 			vscode.window.showErrorMessage(`Logout failed: ${error.message}`);
 		}
 	});
-
-	// Register the unified React webview provider
-	const reactWebviewProvider = new ReactWebviewProvider(context, emailAuthService);
 	const viewProviderDisposable = vscode.window.registerWebviewViewProvider('texgpt.view', reactWebviewProvider);
 	context.subscriptions.push(viewProviderDisposable);
 
