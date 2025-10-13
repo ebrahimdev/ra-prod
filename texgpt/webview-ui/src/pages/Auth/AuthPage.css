@@ -46,6 +46,11 @@
   width: 100%;
 }
 
+.google-auth {
+  display: flex;
+  width: 100%;
+}
+
 .google-auth-btn {
   margin: auto;
 }

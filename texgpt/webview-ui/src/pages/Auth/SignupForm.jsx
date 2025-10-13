@@ -27,28 +27,32 @@ const SignupForm = () => {
   return (
     <form onSubmit={handleSubmit} className="auth-form">
       <div className="auth-form-fields">
-        <VSCodeTextField
-          type="email"
-          value={email}
-          onInput={(e) => {
-            setEmail(e.target.value);
-            if (errors.email) setErrors({ ...errors, email: null });
-          }}
-          placeholder="Email"
-          className="input-full-width"
-        />
-        {errors.email && <span className="input-error-text">{errors.email}</span>}
-        <VSCodeTextField
-          type="password"
-          value={password}
-          onInput={(e) => {
-            setPassword(e.target.value);
-            if (errors.password) setErrors({ ...errors, password: null });
-          }}
-          placeholder="Password"
-          className="input-full-width"
-        />
-        {errors.password && <span className="input-error-text">{errors.password}</span>}
+        <div className="input-wrapper">
+          <VSCodeTextField
+            type="email"
+            value={email}
+            onInput={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors({ ...errors, email: null });
+            }}
+            placeholder="Email"
+            className="input-full-width"
+          />
+          {errors.email && <span className="input-error-text">{errors.email}</span>}
+        </div>
+        <div className="input-wrapper">
+          <VSCodeTextField
+            type="password"
+            value={password}
+            onInput={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors({ ...errors, password: null });
+            }}
+            placeholder="Password"
+            className="input-full-width"
+          />
+          {errors.password && <span className="input-error-text">{errors.password}</span>}
+        </div>
       </div>
 
       <VSCodeButton

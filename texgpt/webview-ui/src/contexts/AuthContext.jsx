@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
   // Handle messages from the extension
   const handleMessage = useCallback((message) => {
@@ -15,6 +16,12 @@ export const AuthProvider = ({ children }) => {
       case 'setUser':
         setUser(message.user);
         setLoading(false);
+        // Check if this is a first-time user
+        // TEMP: Always show onboarding for testing
+        setIsFirstTimeUser(true);
+        // if (message.isFirstTimeUser) {
+        //   setIsFirstTimeUser(true);
+        // }
         // Persist user in webview state
         setState({ user: message.user });
         break;
@@ -48,6 +55,8 @@ export const AuthProvider = ({ children }) => {
     if (savedState?.user) {
       setUser(savedState.user);
       setLoading(false);
+      // TEMP: Always show onboarding for testing
+      setIsFirstTimeUser(true);
     } else {
       // Request user data from extension
       sendMessage({ command: 'requestUserData' });
@@ -83,15 +92,22 @@ export const AuthProvider = ({ children }) => {
     sendMessage({ command: 'logout' });
   }, [sendMessage]);
 
+  const markOnboardingComplete = useCallback(() => {
+    setIsFirstTimeUser(false);
+    sendMessage({ command: 'markOnboardingComplete' });
+  }, [sendMessage]);
+
   const value = {
     user,
     loading,
     error,
     isAuthenticated: !!user,
+    isFirstTimeUser,
     login,
     register,
     loginWithGoogle,
-    logout
+    logout,
+    markOnboardingComplete
   };
 
   return (

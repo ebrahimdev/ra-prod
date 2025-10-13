@@ -1,0 +1,98 @@
+.onboarding-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.onboarding-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  max-width: 268px;
+  text-align: center;
+}
+
+.onboarding-main-title {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.slide-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  min-height: 300px;
+  width: 100%;
+}
+
+.slide-icon {
+  font-size: 80px;
+  margin-bottom: 10px;
+  color: var(--vscode-textLink-foreground);
+}
+
+.slide-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.slide-description {
+  font-size: 11px;
+  font-weight: 500;
+  width: 100%;
+  margin: 0;
+  color: #D4D4D4;
+}
+
+.pagination-dots {
+  display: flex;
+  gap: 3.6px;
+  align-items: center;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #808080;
+  transition: all 0.3s ease;
+}
+
+.dot.active {
+  width: 6px;
+  height: 6px;
+  background-color: #D4D4D4;
+}
+
+.onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.onboarding-btn {
+  font-weight: 500;
+  font-size: 13px;
+  padding: 2px 0px 2px 0px;
+}
+
+.skip-link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.skip-link:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}

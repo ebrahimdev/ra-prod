@@ -9,14 +9,19 @@ import './AuthPage.css';
 
 const AuthPage = () => {
   const [isSignup, setIsSignup] = useState(true);
-  const { isAuthenticated, loginWithGoogle } = useAuth();
+  const { isAuthenticated, isFirstTimeUser, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      if (isFirstTimeUser) {
+        navigate('/onboarding', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, isFirstTimeUser, navigate]);
+
 
   return (
     <div className="auth-page">

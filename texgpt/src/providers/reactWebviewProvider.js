@@ -46,6 +46,10 @@ class ReactWebviewProvider {
                     vscode.commands.executeCommand('texgpt.logout');
                     break;
 
+                case 'markOnboardingComplete':
+                    this._context.globalState.update('texgpt.hasSeenOnboarding', true);
+                    break;
+
                 default:
                     break;
             }
@@ -58,12 +62,13 @@ class ReactWebviewProvider {
     async sendUserData() {
         if (this.webviewView && this.emailAuthService) {
             const user = await this.emailAuthService.getCurrentUser();
-            if (user) {
-                this.webviewView.webview.postMessage({
-                    command: 'setUser',
-                    user: user
-                });
-            }
+            const hasSeenOnboarding = this._context.globalState.get('texgpt.hasSeenOnboarding', false);
+
+            this.webviewView.webview.postMessage({
+                command: 'setUser',
+                user: user || null,
+                isFirstTimeUser: user && !hasSeenOnboarding
+            });
         }
     }
 
