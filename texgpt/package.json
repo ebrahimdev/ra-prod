@@ -43,6 +43,21 @@
       {
         "command": "texgpt.logout",
         "title": "TeXGPT: Logout"
+      },
+      {
+        "command": "texgpt.notifications",
+        "title": "Notifications",
+        "icon": "resources/icons/notification.svg"
+      },
+      {
+        "command": "texgpt.library",
+        "title": "Library",
+        "icon": "resources/icons/library.svg"
+      },
+      {
+        "command": "texgpt.moreOptions",
+        "title": "More Options",
+        "icon": "$(ellipsis)"
       }
     ],
     "views": {
@@ -52,6 +67,25 @@
           "name": "",
           "type": "webview",
           "when": "true"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "texgpt.notifications",
+          "when": "view == texgpt.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "texgpt.library",
+          "when": "view == texgpt.view",
+          "group": "navigation@2"
+        },
+        {
+          "command": "texgpt.moreOptions",
+          "when": "view == texgpt.view",
+          "group": "navigation@3"
         }
       ]
     },
