@@ -181,7 +181,29 @@ function activate(context) {
 	const viewProviderDisposable = vscode.window.registerWebviewViewProvider('texgpt.view', reactWebviewProvider);
 	context.subscriptions.push(viewProviderDisposable);
 
-	context.subscriptions.push(disposable, signupDisposable, signupEmailDisposable, loginEmailDisposable, logoutDisposable);
+	// Register view title bar commands
+	const notificationsDisposable = vscode.commands.registerCommand('texgpt.notifications', () => {
+		vscode.window.showInformationMessage('Notifications feature coming soon!');
+	});
+
+	const libraryDisposable = vscode.commands.registerCommand('texgpt.library', () => {
+		vscode.window.showInformationMessage('Library feature coming soon!');
+	});
+
+	const moreOptionsDisposable = vscode.commands.registerCommand('texgpt.moreOptions', () => {
+		vscode.window.showInformationMessage('More options coming soon!');
+	});
+
+	context.subscriptions.push(
+		disposable,
+		signupDisposable,
+		signupEmailDisposable,
+		loginEmailDisposable,
+		logoutDisposable,
+		notificationsDisposable,
+		libraryDisposable,
+		moreOptionsDisposable
+	);
 }
 
 // This method is called when your extension is deactivated
