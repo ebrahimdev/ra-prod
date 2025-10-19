@@ -30,6 +30,7 @@ tmux send-keys 'python app.py' C-m
 tmux select-pane -t 2
 tmux send-keys 'cd texgpt' C-m
 tmux send-keys 'npm install' C-m
+tmux send-keys 'npm run build:webview && npm run dev:webview' C-m
 
 # Attach to the session
 tmux attach-session -t ra-prod
