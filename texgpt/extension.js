@@ -140,10 +140,26 @@ function activate(context) {
 				vscode.commands.executeCommand('texgpt.openChat', 'new');
 			} else {
 				vscode.window.showErrorMessage(`Signup failed: ${result.error}`);
+
+				// Send error message to webview to reset loading state
+				if (reactWebviewProvider.webviewView) {
+					reactWebviewProvider.webviewView.webview.postMessage({
+						command: 'authError',
+						error: result.error
+					});
+				}
 			}
 		} catch (error) {
 			console.error('Error during email signup:', error);
 			vscode.window.showErrorMessage(`Signup failed: ${error.message}`);
+
+			// Send error message to webview to reset loading state
+			if (reactWebviewProvider.webviewView) {
+				reactWebviewProvider.webviewView.webview.postMessage({
+					command: 'authError',
+					error: error.message
+				});
+			}
 		}
 	});
 
@@ -167,10 +183,26 @@ function activate(context) {
 				vscode.commands.executeCommand('texgpt.openChat', 'new');
 			} else {
 				vscode.window.showErrorMessage(`Login failed: ${result.error}`);
+
+				// Send error message to webview to reset loading state
+				if (reactWebviewProvider.webviewView) {
+					reactWebviewProvider.webviewView.webview.postMessage({
+						command: 'authError',
+						error: result.error
+					});
+				}
 			}
 		} catch (error) {
 			console.error('Error during email login:', error);
 			vscode.window.showErrorMessage(`Login failed: ${error.message}`);
+
+			// Send error message to webview to reset loading state
+			if (reactWebviewProvider.webviewView) {
+				reactWebviewProvider.webviewView.webview.postMessage({
+					command: 'authError',
+					error: error.message
+				});
+			}
 		}
 	});
 
