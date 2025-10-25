@@ -45,6 +45,10 @@
         "title": "TeXGPT: Logout"
       },
       {
+        "command": "texgpt.openChat",
+        "title": "TeXGPT: Open Chat"
+      },
+      {
         "command": "texgpt.notifications",
         "title": "Notifications",
         "icon": "resources/icons/notification.svg"

@@ -5,7 +5,9 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const ReactWebviewProvider = require('./src/providers/reactWebviewProvider');
+const ChatWebviewProvider = require('./src/providers/chatWebviewProvider');
 const EmailAuthService = require('./src/services/emailAuthService');
+const ChatService = require('./src/services/chatService');
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -65,6 +67,9 @@ function activate(context) {
 					}
 
 					vscode.window.showInformationMessage(`Welcome to TeXGPT, ${userFirstName}! You are now signed in.`);
+
+					// Open chat editor after successful Google OAuth
+					vscode.commands.executeCommand('texgpt.openChat', 'new');
 				} else {
 					vscode.window.showErrorMessage('Sign-up failed: Invalid response from auth server.');
 				}
@@ -104,8 +109,13 @@ function activate(context) {
 		}
 	});
 
-	// Initialize email auth service
+	// Initialize services
 	const emailAuthService = new EmailAuthService(context);
+	const chatService = new ChatService(context);
+
+	// Initialize providers
+	const reactWebviewProvider = new ReactWebviewProvider(context, emailAuthService);
+	const chatWebviewProvider = new ChatWebviewProvider(context, chatService);
 
 	// Register email signup command
 	const signupEmailDisposable = vscode.commands.registerCommand('texgpt.signupWithEmail', async function (email, password) {
@@ -121,8 +131,13 @@ function activate(context) {
 				// Mark as first-time user (they haven't seen onboarding yet)
 				context.globalState.update('texgpt.hasSeenOnboarding', false);
 
-				// Reload window to switch to onboarding view
-				vscode.commands.executeCommand('workbench.action.reloadWindow');
+				// Update the webview with user data
+				if (reactWebviewProvider.webviewView) {
+					await reactWebviewProvider.sendUserData();
+				}
+
+				// Open chat editor for new user
+				vscode.commands.executeCommand('texgpt.openChat', 'new');
 			} else {
 				vscode.window.showErrorMessage(`Signup failed: ${result.error}`);
 			}
@@ -143,8 +158,13 @@ function activate(context) {
 				const userName = result.user.first_name || result.user.email.split('@')[0];
 				vscode.window.showInformationMessage(`Welcome back, ${userName}!`);
 
-				// Reload window to switch to dashboard view
-				vscode.commands.executeCommand('workbench.action.reloadWindow');
+				// Update the webview with user data
+				if (reactWebviewProvider.webviewView) {
+					await reactWebviewProvider.sendUserData();
+				}
+
+				// Open chat editor for returning user
+				vscode.commands.executeCommand('texgpt.openChat', 'new');
 			} else {
 				vscode.window.showErrorMessage(`Login failed: ${result.error}`);
 			}
@@ -153,9 +173,6 @@ function activate(context) {
 			vscode.window.showErrorMessage(`Login failed: ${error.message}`);
 		}
 	});
-
-	// Register the unified React webview provider
-	const reactWebviewProvider = new ReactWebviewProvider(context, emailAuthService);
 
 	// Register logout command
 	const logoutDisposable = vscode.commands.registerCommand('texgpt.logout', async function () {
@@ -194,6 +211,23 @@ function activate(context) {
 		vscode.window.showInformationMessage('More options coming soon!');
 	});
 
+	// Register open chat command
+	const openChatDisposable = vscode.commands.registerCommand('texgpt.openChat', async (conversationId) => {
+		// Check if user is authenticated
+		const user = await emailAuthService.getCurrentUser();
+
+		if (!user) {
+			// User not logged in - show dashboard sidebar to prompt login
+			vscode.window.showInformationMessage('Please log in to use TeXGPT Chat');
+			// Focus the dashboard view in sidebar
+			vscode.commands.executeCommand('texgpt.view.focus');
+			return;
+		}
+
+		// User is authenticated - open chat
+		chatWebviewProvider.createChatPanel(conversationId);
+	});
+
 	context.subscriptions.push(
 		disposable,
 		signupDisposable,
@@ -202,7 +236,8 @@ function activate(context) {
 		logoutDisposable,
 		notificationsDisposable,
 		libraryDisposable,
-		moreOptionsDisposable
+		moreOptionsDisposable,
+		openChatDisposable
 	);
 }
 
