@@ -9,8 +9,12 @@
     "build": "npm run build:dashboard && npm run build:chat",
     "build:dashboard": "BUILD_TARGET=dashboard vite build",
     "build:chat": "BUILD_TARGET=chat vite build",
-    "watch": "BUILD_TARGET=dashboard vite build --watch",
+    "watch": "concurrently \"npm run watch:dashboard\" \"npm run watch:chat\"",
+    "watch:dashboard": "BUILD_TARGET=dashboard vite build --watch",
     "watch:chat": "BUILD_TARGET=chat vite build --watch",
     "preview": "vite preview"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

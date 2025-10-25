@@ -108,6 +108,7 @@
     "pretest": "npm run lint",
     "test": "vscode-test",
     "build:webview": "cd webview-ui && npm run build",
+    "watch": "cd webview-ui && npm run watch",
     "watch:webview": "cd webview-ui && npm run watch",
     "dev:webview": "cd webview-ui && npm run dev"
   },
