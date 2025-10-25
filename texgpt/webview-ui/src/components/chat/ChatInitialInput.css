@@ -1,0 +1,92 @@
+.chat-initial-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  max-width: 600px;
+  margin: 0 auto;
+  height: 100%;
+}
+
+.chat-initial-title {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+
+.chat-initial-description {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+  margin: 0 0 32px 0;
+  line-height: 1.5;
+}
+
+.chat-input-form {
+  width: 100%;
+}
+
+.chat-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: border-color 0.2s ease;
+}
+
+.chat-input-container:focus-within {
+  border-color: var(--vscode-focusBorder);
+}
+
+.chat-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--vscode-input-foreground);
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+  outline: none;
+  resize: none;
+  min-height: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.chat-input-field::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.chat-send-button {
+  background: transparent;
+  border: none;
+  color: var(--vscode-button-foreground);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.chat-send-button:hover:not(:disabled) {
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.chat-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-send-button svg {
+  width: 16px;
+  height: 16px;
+}
