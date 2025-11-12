@@ -1,13 +1,38 @@
 .chat-editor-page {
-  height: 100%;
+  height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
   background-color: var(--vscode-editor-background);
+  overflow: hidden;
 }
 
-.chat-messages {
+.chat-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background-color: var(--vscode-inputValidation-errorBackground);
+  border-bottom: 1px solid var(--vscode-inputValidation-errorBorder);
+}
+
+.chat-error-message {
   flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+  color: var(--vscode-inputValidation-errorForeground);
+  font-size: 13px;
+}
+
+.chat-error-dismiss {
+  background: none;
+  border: none;
+  color: var(--vscode-inputValidation-errorForeground);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 8px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.chat-error-dismiss:hover {
+  opacity: 1;
 }

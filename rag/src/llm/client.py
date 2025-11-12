@@ -315,7 +315,7 @@ class OpenRouterClient:
     def chat_completion(
         self,
         messages: List[Dict[str, str]],
-        model: str = "deepseek/deepseek-r1:free",
+        model: str = "nvidia/nemotron-nano-12b-v2-vl:free",
         max_tokens: int = 500,
         temperature: float = 0.1
     ) -> LLMResponse:
@@ -388,11 +388,11 @@ class FailoverLLMClient:
         # Determine model based on client type if auto
         if model == "auto":
             if isinstance(self.primary_client, OpenRouterClient):
-                primary_model = "deepseek/deepseek-r1:free"
+                primary_model = "nvidia/nemotron-nano-12b-v2-vl:free"
                 fallback_model = "openchat"
             else:
                 primary_model = "openchat"
-                fallback_model = "deepseek/deepseek-r1:free"
+                fallback_model = "nvidia/nemotron-nano-12b-v2-vl:free"
         else:
             primary_model = fallback_model = model
         

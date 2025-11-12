@@ -8,6 +8,7 @@ const ReactWebviewProvider = require('./src/providers/reactWebviewProvider');
 const ChatWebviewProvider = require('./src/providers/chatWebviewProvider');
 const EmailAuthService = require('./src/services/emailAuthService');
 const ChatService = require('./src/services/chatService');
+const RagService = require('./src/services/ragService');
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -112,10 +113,11 @@ function activate(context) {
 	// Initialize services
 	const emailAuthService = new EmailAuthService(context);
 	const chatService = new ChatService(context);
+	const ragService = new RagService(context);
 
 	// Initialize providers
 	const reactWebviewProvider = new ReactWebviewProvider(context, emailAuthService);
-	const chatWebviewProvider = new ChatWebviewProvider(context, chatService);
+	const chatWebviewProvider = new ChatWebviewProvider(context, chatService, ragService, emailAuthService);
 
 	// Register email signup command
 	const signupEmailDisposable = vscode.commands.registerCommand('texgpt.signupWithEmail', async function (email, password) {

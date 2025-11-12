@@ -3,9 +3,11 @@ const path = require('path');
 const fs = require('fs');
 
 class ChatWebviewProvider {
-    constructor(context, chatService) {
+    constructor(context, chatService, ragService, emailAuthService) {
         this._context = context;
         this.chatService = chatService;
+        this.ragService = ragService;
+        this.emailAuthService = emailAuthService;
     }
 
     /**
@@ -52,16 +54,58 @@ class ChatWebviewProvider {
         return panel;
     }
 
-    _handleMessage(message, panel, conversationId) {
+    async _handleMessage(message, panel, conversationId) {
         switch (message.command) {
             case 'ready':
                 // Chat app is ready
                 console.log('Chat webview ready:', conversationId);
                 break;
 
+            case 'sendMessage':
+                await this._handleSendMessage(message, panel);
+                break;
+
             default:
                 console.log('Unknown chat message:', message.command);
                 break;
+        }
+    }
+
+    async _handleSendMessage(message, panel) {
+        try {
+            const { text, sessionId } = message;
+
+            // Get access token
+            const { accessToken } = await this.emailAuthService.getStoredTokens();
+
+            if (!accessToken) {
+                panel.webview.postMessage({
+                    command: 'messageError',
+                    error: 'Not authenticated. Please log in first.'
+                });
+                return;
+            }
+
+            // Send message to RAG service
+            const result = await this.ragService.sendMessage(text, sessionId, accessToken);
+
+            if (result.success) {
+                panel.webview.postMessage({
+                    command: 'messageResponse',
+                    data: result.data
+                });
+            } else {
+                panel.webview.postMessage({
+                    command: 'messageError',
+                    error: result.error
+                });
+            }
+        } catch (error) {
+            console.error('Error handling send message:', error);
+            panel.webview.postMessage({
+                command: 'messageError',
+                error: 'Failed to send message'
+            });
         }
     }
 
