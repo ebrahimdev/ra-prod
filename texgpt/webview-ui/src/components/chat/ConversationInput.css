@@ -1,0 +1,90 @@
+.conversation-input {
+  border-top: 1px solid var(--vscode-panel-border);
+  padding: 16px 20px;
+  background-color: var(--vscode-editor-background);
+}
+
+.conversation-input-form {
+  width: 100%;
+}
+
+.conversation-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  transition: border-color 0.2s;
+}
+
+.conversation-input-container:focus-within {
+  border-color: var(--vscode-focusBorder);
+}
+
+.conversation-attach-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--vscode-foreground);
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.conversation-attach-button:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.conversation-attach-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.conversation-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--vscode-input-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: 13px;
+  resize: none;
+  min-height: 20px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.conversation-input-field::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.conversation-input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.conversation-send-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--vscode-button-background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.conversation-send-button:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.conversation-send-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

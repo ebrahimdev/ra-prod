@@ -64,24 +64,34 @@ class MessageRole(enum.Enum):
 
 class ChatSession(Base):
     __tablename__ = 'chat_sessions'
-    
+
     id = Column(String(36), primary_key=True)  # UUID
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, nullable=False, index=True)
     title = Column(String(500), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    last_activity = Column(DateTime, default=datetime.utcnow)
-    
+    last_activity = Column(DateTime, default=datetime.utcnow, index=True)
+    message_count = Column(Integer, default=0)  # Track total messages in session
+    total_tokens = Column(Integer, default=0)  # Track token usage
+    session_metadata = Column(JSON)  # Store tags, categories, settings, etc.
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+
     # Relationship to messages
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
 
 class ChatMessage(Base):
     __tablename__ = 'chat_messages'
-    
+
     id = Column(String(36), primary_key=True)  # UUID
-    session_id = Column(String(36), ForeignKey('chat_sessions.id'), nullable=False)
+    session_id = Column(String(36), ForeignKey('chat_sessions.id'), nullable=False, index=True)
     role = Column(Enum(MessageRole), nullable=False)
     content = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    sequence = Column(Integer)  # Explicit message ordering within session
+    tokens_used = Column(Integer)  # Track tokens for this message
+    model_version = Column(String(50))  # Track which model generated response
+    context_documents = Column(JSON)  # Store document IDs used for context
+    message_metadata = Column(JSON)  # Store additional data (latency, confidence, etc.)
+    deleted_at = Column(DateTime, nullable=True)  # Soft delete support
+
     # Relationship back to session
     session = relationship("ChatSession", back_populates="messages")

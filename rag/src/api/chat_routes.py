@@ -47,7 +47,11 @@ def send_message():
         try:
             # Get or create session
             if session_id:
-                session = db.query(ChatSession).filter_by(id=session_id, user_id=user_id).first()
+                session = db.query(ChatSession).filter_by(
+                    id=session_id,
+                    user_id=user_id,
+                    deleted_at=None  # Only get non-deleted sessions
+                ).first()
                 if not session:
                     return jsonify({"error": "Chat session not found"}), 404
             else:
@@ -57,19 +61,27 @@ def send_message():
                 session = ChatSession(
                     id=session_id,
                     user_id=user_id,
-                    title=session_title
+                    title=session_title,
+                    message_count=0,
+                    total_tokens=0
                 )
                 db.add(session)
                 db.flush()  # Get the session ID
             
-            # Get chat history from database
-            messages = db.query(ChatMessage).filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+            # Get chat history from database (excluding deleted messages)
+            messages = db.query(ChatMessage).filter_by(
+                session_id=session_id,
+                deleted_at=None  # Only get non-deleted messages
+            ).order_by(ChatMessage.sequence, ChatMessage.timestamp).all()
             chat_history = []
             for msg in messages:
                 chat_history.append({
                     "role": msg.role.value,
                     "content": msg.content
                 })
+
+            # Calculate next sequence number
+            next_sequence = len(messages) + 1
             
             # Save user message to database
             user_msg_id = str(uuid.uuid4())
@@ -78,9 +90,11 @@ def send_message():
                 session_id=session_id,
                 role=MessageRole.USER,
                 content=user_message,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
+                sequence=next_sequence
             )
             db.add(user_db_message)
+            next_sequence += 1
             
             # Generate chat response with document context
             document_service = DocumentService(db)
@@ -99,12 +113,15 @@ def send_message():
                 session_id=session_id,
                 role=MessageRole.ASSISTANT,
                 content=chat_response,
-                timestamp=assistant_timestamp
+                timestamp=assistant_timestamp,
+                sequence=next_sequence,
+                model_version="gpt-3.5-turbo"  # Update this based on actual model used
             )
             db.add(assistant_db_message)
-            
-            # Update session last activity
+
+            # Update session last activity and message count
             session.last_activity = assistant_timestamp
+            session.message_count = (session.message_count or 0) + 2  # User + assistant messages
             
             # Commit all changes
             db.commit()
@@ -138,8 +155,11 @@ def get_sessions():
         
         db = get_db()
         try:
-            # Get sessions ordered by last activity (most recent first)
-            sessions = db.query(ChatSession).filter_by(user_id=user_id).order_by(desc(ChatSession.last_activity)).all()
+            # Get sessions ordered by last activity (most recent first), excluding deleted
+            sessions = db.query(ChatSession).filter_by(
+                user_id=user_id,
+                deleted_at=None  # Only get non-deleted sessions
+            ).order_by(desc(ChatSession.last_activity)).all()
             
             sessions_data = []
             for session in sessions:
@@ -147,7 +167,8 @@ def get_sessions():
                     "id": session.id,
                     "title": session.title,
                     "created_at": session.created_at.isoformat(),
-                    "last_activity": session.last_activity.isoformat()
+                    "last_activity": session.last_activity.isoformat(),
+                    "message_count": session.message_count or 0
                 })
             
             return jsonify({"sessions": sessions_data})
@@ -165,17 +186,24 @@ def get_session(session_id):
     """Get specific chat session with full message history."""
     try:
         user_id = request.current_user['id']
-        
+
         db = get_db()
         try:
-            # Get session and ensure it belongs to the user
-            session = db.query(ChatSession).filter_by(id=session_id, user_id=user_id).first()
+            # Get session and ensure it belongs to the user (and not deleted)
+            session = db.query(ChatSession).filter_by(
+                id=session_id,
+                user_id=user_id,
+                deleted_at=None  # Only get non-deleted sessions
+            ).first()
             
             if not session:
                 return jsonify({"error": "Chat session not found"}), 404
             
-            # Get messages for the session
-            messages = db.query(ChatMessage).filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+            # Get messages for the session (excluding deleted messages)
+            messages = db.query(ChatMessage).filter_by(
+                session_id=session_id,
+                deleted_at=None  # Only get non-deleted messages
+            ).order_by(ChatMessage.sequence, ChatMessage.timestamp).all()
             
             messages_data = []
             for message in messages:
@@ -213,13 +241,23 @@ def delete_session(session_id):
         db = get_db()
         try:
             # Get session and ensure it belongs to the user
-            session = db.query(ChatSession).filter_by(id=session_id, user_id=user_id).first()
-            
+            session = db.query(ChatSession).filter_by(
+                id=session_id,
+                user_id=user_id,
+                deleted_at=None  # Only delete non-deleted sessions
+            ).first()
+
             if not session:
                 return jsonify({"error": "Chat session not found"}), 404
-            
-            # Delete the session (messages will be deleted automatically due to cascade)
-            db.delete(session)
+
+            # Soft delete the session
+            session.deleted_at = datetime.utcnow()
+
+            # Soft delete all messages in the session
+            messages = db.query(ChatMessage).filter_by(session_id=session_id).all()
+            for message in messages:
+                message.deleted_at = datetime.utcnow()
+
             db.commit()
             
             return jsonify({"message": "Chat session deleted successfully"})
